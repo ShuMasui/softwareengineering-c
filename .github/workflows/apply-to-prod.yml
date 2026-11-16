@@ -1,26 +1,29 @@
 # インフラ（Terraform）の plan と apply。ENG-011。説明は docs/engineering/infra.md。
 #
 # 流れ
-#   1. pull_request（infra/ の変更）: fmt・validate・plan だけ。apply はしない。
+#   1. pull_request（infra/env/ と infra/modules/ の変更）: fmt・validate・plan だけ。apply はしない。
 #   2. main への push: plan を作り、計画ファイルを S3 に保存する。
 #   3. 承認: GitHub の Environment「production」の承認者が承認する。
 #   4. apply: S3 から計画ファイルを取り出して、そのまま apply する（plan をやり直さない）。
 #   5. 手動（workflow_dispatch）: plan_sha を指定すると、S3 に保存済みのその計画で apply する。
 #
 # 前提（GitHub の Variables）: TF_STATE_BUCKET, TF_PLAN_BUCKET, TF_PLAN_ROLE_ARN, TF_APPLY_ROLE_ARN
-# 前提（Terraform）: infra/ に backend "s3" {}（中身は空）を書く。バケット等は init のときに渡す。
+# 前提（Terraform）: infra/env/prod/ に backend "s3" {}（中身は空）を書く。バケット等は init のときに渡す。
+#   infra/bootstrap/ は、この workflow に含めない（手元で1回だけ apply する）。
 
 name: apply-to-prod
 
 on:
   pull_request:
     paths:
-      - 'infra/**'
+      - 'infra/env/**'
+      - 'infra/modules/**'
       - '.github/workflows/apply-to-prod.yml'
   push:
     branches: [main]
     paths:
-      - 'infra/**'
+      - 'infra/env/**'
+      - 'infra/modules/**'
   workflow_dispatch:
     inputs:
       plan_sha:
@@ -50,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: infra
+        working-directory: infra/env/prod
     steps:
       - uses: actions/checkout@v4
 
@@ -64,14 +67,15 @@ jobs:
           role-to-assume: ${{ vars.TF_PLAN_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Terraform fmt
+      - name: Terraform fmt（infra/ の全部）
+        working-directory: infra
         run: terraform fmt -check -recursive
 
       - name: Terraform init
         run: >-
           terraform init -input=false
           -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
-          -backend-config="key=attendance/terraform.tfstate"
+          -backend-config="key=prod/terraform.tfstate"
           -backend-config="region=${{ env.AWS_REGION }}"
           -backend-config="use_lockfile=true"
 
@@ -109,7 +113,7 @@ jobs:
     environment: production
     defaults:
       run:
-        working-directory: infra
+        working-directory: infra/env/prod
     steps:
       # 計画を作ったときと同じコミットのコードで apply する
       - uses: actions/checkout@v4
@@ -133,7 +137,7 @@ jobs:
         run: >-
           terraform init -input=false
           -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
-          -backend-config="key=attendance/terraform.tfstate"
+          -backend-config="key=prod/terraform.tfstate"
           -backend-config="region=${{ env.AWS_REGION }}"
           -backend-config="use_lockfile=true"
 

@@ -15,7 +15,7 @@
 - キー以外の項目は、1エンティティ5つ以内。共通項目（作成者・作成日時・更新者・更新日時・削除フラグ）は持たない。削除は物理削除。
 - 楽観的排他の `last_update_version` は、修正が競合する出欠（Attendance）だけが持つ。
 - **欠課時数は保存しない。** backend が出欠から毎回計算する（下の「欠課時数の集計」）。
-- ID: `user_id` は Cognito のユーザーID（sub）。学生・教員のIDは `user_id` と同じ値にする。授業・授業回は ULID を backend で作る。
+- ID: `user_id` は Cognito のユーザーID（sub）。学生・教員のIDは `user_id` と同じ値にする。授業・授業回は UUID v7（google/uuid の `NewV7`。時刻順に並ぶ）を backend で作る。
 - 日時: ISO 8601 の文字列、日本時間（例 `2026-11-16T09:00:00+09:00`）。時刻だけの項目は `HH:mm`。
 - 区分: 数値。値は [codes.md](../catalog/codes.md)。
 
@@ -41,7 +41,7 @@
 | タッチログ（図にない。ENG-007） | `SESSION#{session_id}` | `TOUCH#{touch_id}` | — | `CARD#{card_uid}` / `TOUCH#{touch_id}` | card_uid, result_div, touch_datetime | 3 |
 
 - 授業回（AttendanceSession）と、その出欠・修正履歴・タッチログは、同じ `SESSION#{session_id}` のパーティションに入る（授業回の集約が出欠を持つ、というドメインモデルのとおり）。
-- `touch_id` は ULID（時刻順に並ぶ）。
+- `touch_id` は UUID v7（時刻順に並ぶ）。
 - 授業回の日時を変えたときは、その授業回の出欠の GSI キー（`start_datetime` を含む）も更新する。出欠は受付開始より後にできるので、通常は起きない。
 
 ## アクセスパターンと操作

@@ -2,7 +2,7 @@
 
 ブラウザで使う Webアプリ。学生と教員が使う12画面。
 
-技術（設計書3章）: React + TypeScript。PC・スマートフォンの両方に対応する。UIは日本語のみ。
+技術: **TypeScript**、**React + Vite + Tailwind CSS**（ENG-013。提出版は React + TypeScript）。PC・スマートフォンの両方に対応する。UIは日本語のみ。
 
 ## 設計書上の担当範囲
 

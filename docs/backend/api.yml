@@ -985,14 +985,14 @@ components:
       name: classId
       in: path
       required: true
-      description: 授業ID（ULID）
+      description: 授業ID（UUID v7）
       schema:
         type: string
     SessionId:
       name: sessionId
       in: path
       required: true
-      description: 授業回ID（ULID）
+      description: 授業回ID（UUID v7）
       schema:
         type: string
     StudentId:

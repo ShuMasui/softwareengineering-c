@@ -2,8 +2,10 @@
 
 Web API と、サーバ側の処理（認証・バッチ・メール・ファイル）。**DB・認証・メールに接続するのはここだけ**で、ブラウザも受付アプリも同じAPIを呼ぶ。
 
-技術: Node.js + TypeScript、REST API、MVC構成、Nginx（HTTPS）は設計書3章のまま。次の3点は設計書から変えている（[決定ログ](../engineering/decisions.md)）。
+技術: REST API、HTTPS は設計書3章のまま。次の点は設計書から変えている（[決定ログ](../engineering/decisions.md)）。
 
+- 言語と置き場所: **Go**、**AWS Lambda**（ENG-012。提出版は Node.js + TypeScript と Nginx）
+- ライブラリ: **Wire**（依存性の注入）、**AWS SDK for Go v2**、**google/uuid**（IDは UUID v7）。これ以外は未選定（N-18）
 - DB: **Amazon DynamoDB**（ENG-001。提出版は MySQL）
 - 認証: **Amazon Cognito**（ENG-002〜005。提出版は Microsoft Entra ID）
 - メールの送信手段: 未決（N-09。提出版は Microsoft Graph API。希望機能）

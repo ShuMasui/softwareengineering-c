@@ -6,13 +6,14 @@
 
 ## 提出版から変更した事項
 
-上の設計書（提出版）と食い違うときは、こちらを優先する。経緯と詳細は [docs/engineering/decisions.md](docs/engineering/decisions.md) の ENG-001〜011。
+上の設計書（提出版）と食い違うときは、こちらを優先する。経緯と詳細は [docs/engineering/decisions.md](docs/engineering/decisions.md) の ENG-001〜015。
 
 - **DB**: MySQL → **Amazon DynamoDB**（ENG-001）。ビュー・外部キー・自動採番・SQLがない。形は [docs/engineering/system/db-schema.md](docs/engineering/system/db-schema.md) のとおり（ENG-010）。
 - **認証**: Microsoft Entra ID → **Amazon Cognito のID・パスワード管理**（ENG-002）。ログインIDは Microsoft のメールアドレス（ENG-003）。ユーザープールは学生用と教員用の2つで、サインインは Hosted UI（ENG-004）。**Cognito との接続は最終フェーズ**で、それまでは仮の認証で開発する（ENG-005）。ユーザーは Cognito の標準フロー（招待メールの仮パスワード → 初回サインインで本登録）で作る（ENG-009）。
 - **ドメインモデル**: [docs/engineering/system/domain-model.md](docs/engineering/system/domain-model.md) の図を使う（ENG-006）。User と ClassTeacherMembership が加わり、授業と教員は多対多。出欠は学生ではなく受講（StudentClassMembership）を参照し、授業回（AttendanceSession）が持つ。
 - **項目数**: 詳細の項目は自由に決めてよいが、1エンティティにつき**キー以外5つ以内**（ENG-008）。
-- **インフラ**: **Terraform** で実装し（コードはユーザーが書く）、state は S3 に置く。`terraform apply` は GitHub Actions の workflow で、S3 に保存した計画を使って行う（ENG-011、[docs/engineering/infra.md](docs/engineering/infra.md)）。
+- **言語と基盤**: backend は **Go（AWS Lambda）**。ライブラリは Wire・AWS SDK for Go v2・google/uuid（ENG-012）。Web は **TypeScript（React + Vite + Tailwind CSS）**（ENG-013）。受付アプリは **C#（AWS SDK for .NET）**で、残りは実装者が決める（ENG-014）。IDは UUID（時刻順に並べるものは v7）で、ULID は使わない。
+- **インフラ**: **Terraform** で実装し（コードはユーザーが書く）、state は S3 に置く。`terraform apply` は GitHub Actions の workflow で、S3 に保存した計画を使って行う。構成は `infra/` の `bootstrap/`・`env/prod/`・`modules/`（ENG-011、ENG-015、[docs/engineering/infra.md](docs/engineering/infra.md)）。
 
 ## ドキュメントの構成
 
@@ -22,8 +23,8 @@
 docs/
 ├── engineering/   共有事項: basic-design.md（提出版）、decisions.md、repo-structure.md（構成の案）、infra.md（Terraform と workflow）、system/（db-schema, domain-model）、catalog/（messages, codes）
 ├── backend/       Web API・バッチ・認証・メール・ファイル処理の決定事項、api.yml（API仕様。OpenAPI の案）
-├── frontend/      Webアプリ（React）の決定事項、mocks/（画面モック。index.html）
-└── windows/       受付アプリ（C# / WPF）の決定事項、mocks/（画面モック。index.html）
+├── frontend/      Webアプリ（React + Vite）の決定事項、mocks/（画面モック。index.html）
+└── windows/       受付アプリ（C#）の決定事項、mocks/（画面モック。index.html）
 ```
 
 - `engineering/basic-design.md` は**提出版で、書き換えない**。
@@ -40,8 +41,8 @@ docs/
 
 ## 構成（3章）
 
-- Web画面: React + TypeScript / Web API: Node.js + TypeScript（REST、MVC）/ DB: **Amazon DynamoDB** / Webサーバ: Nginx
-- 受付アプリ: C#（.NET、WPF）。PC/SC で学生証のIDを読み、結果を画面と音で表示するだけ。判定ロジックは持たない。
+- Web画面: **TypeScript（React + Vite + Tailwind CSS）** / Web API: **Go（AWS Lambda）**（REST、MVC）/ DB: **Amazon DynamoDB** / インフラ: **Terraform**（Nginx は使わない）
+- 受付アプリ: **C#**（AWS SDK for .NET を使う。UI の枠組みなどは実装者が決める）。PC/SC で学生証のIDを読み、結果を画面と音で表示するだけ。判定ロジックは持たない。
 - 認証: **Amazon Cognito**（学生用・教員用のユーザープール、Hosted UI）。認証の処理は1か所に隔離し、Cognito は最後につなぐ。
 - **DB・認証・メールに接続するのはWebアプリ（API）だけ。** 受付アプリもブラウザも同じAPIを呼ぶ。
 

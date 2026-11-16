@@ -12,9 +12,9 @@ docs/
 │   ├── system/           db-schema、domain-model
 │   └── catalog/          画面に出す文言・コード値の台帳
 ├── backend/            Web API・バッチ・認証・メール・ファイル処理（api.yml: API仕様の案）
-├── frontend/           Webアプリ（React）
+├── frontend/           Webアプリ（React + Vite）
 │   └── mocks/            画面モック
-└── windows/            教室PCの受付アプリ（C# / WPF）
+└── windows/            教室PCの受付アプリ（C#）
     └── mocks/            画面モック
 ```
 
