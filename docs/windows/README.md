@@ -38,7 +38,7 @@
 - **読み取り失敗の色**: オレンジ。
 - **欠課になった後の残り時間**: 「—（これ以降は欠課）」を出す。
 - **切替までの残り時間**: 応答の `serverTime` との差でアプリの時計を補正して表示する（判定そのものはサーバが行う）。
-- **通信**: 申告は `POST /api/v1/reception/touches`。表示は、返ってきた `resultDiv`・`messageId`・`message` で決める（[api.md](../backend/api.md)）。
+- **通信**: 申告は `POST /api/v1/reception/touches`。表示は、返ってきた `resultDiv`・`messageId`・`message` で決める（[api.yml](../backend/api.yml)）。
 
 ## 関連文書
 

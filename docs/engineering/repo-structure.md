@@ -10,6 +10,8 @@ softwareengineering-c/
 │   ├── api/         Web API（Node.js + TypeScript、REST、MVC）
 │   ├── web/         Webアプリ（React + TypeScript）
 │   └── reception/   受付アプリ（C# / .NET / WPF。Windows）
+├── infra/           インフラ（Terraform。ENG-011。ユーザーが書く）
+├── .github/workflows/  apply-to-prod.yml（インフラの plan と apply）
 ├── docs/            設計ドキュメントとモック
 ├── CLAUDE.md
 └── README.md

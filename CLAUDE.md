@@ -6,12 +6,13 @@
 
 ## 提出版から変更した事項
 
-上の設計書（提出版）と食い違うときは、こちらを優先する。経緯と詳細は [docs/engineering/decisions.md](docs/engineering/decisions.md) の ENG-001〜010。
+上の設計書（提出版）と食い違うときは、こちらを優先する。経緯と詳細は [docs/engineering/decisions.md](docs/engineering/decisions.md) の ENG-001〜011。
 
 - **DB**: MySQL → **Amazon DynamoDB**（ENG-001）。ビュー・外部キー・自動採番・SQLがない。形は [docs/engineering/system/db-schema.md](docs/engineering/system/db-schema.md) のとおり（ENG-010）。
 - **認証**: Microsoft Entra ID → **Amazon Cognito のID・パスワード管理**（ENG-002）。ログインIDは Microsoft のメールアドレス（ENG-003）。ユーザープールは学生用と教員用の2つで、サインインは Hosted UI（ENG-004）。**Cognito との接続は最終フェーズ**で、それまでは仮の認証で開発する（ENG-005）。ユーザーは Cognito の標準フロー（招待メールの仮パスワード → 初回サインインで本登録）で作る（ENG-009）。
 - **ドメインモデル**: [docs/engineering/system/domain-model.md](docs/engineering/system/domain-model.md) の図を使う（ENG-006）。User と ClassTeacherMembership が加わり、授業と教員は多対多。出欠は学生ではなく受講（StudentClassMembership）を参照し、授業回（AttendanceSession）が持つ。
 - **項目数**: 詳細の項目は自由に決めてよいが、1エンティティにつき**キー以外5つ以内**（ENG-008）。
+- **インフラ**: **Terraform** で実装し（コードはユーザーが書く）、state は S3 に置く。`terraform apply` は GitHub Actions の workflow で、S3 に保存した計画を使って行う（ENG-011、[docs/engineering/infra.md](docs/engineering/infra.md)）。
 
 ## ドキュメントの構成
 
@@ -19,8 +20,8 @@
 
 ```
 docs/
-├── engineering/   共有事項: basic-design.md（提出版）、decisions.md、repo-structure.md（構成の案）、system/（db-schema, domain-model）、catalog/（messages, codes）
-├── backend/       Web API・バッチ・認証・メール・ファイル処理の決定事項、api.md（API一覧の案）
+├── engineering/   共有事項: basic-design.md（提出版）、decisions.md、repo-structure.md（構成の案）、infra.md（Terraform と workflow）、system/（db-schema, domain-model）、catalog/（messages, codes）
+├── backend/       Web API・バッチ・認証・メール・ファイル処理の決定事項、api.yml（API仕様。OpenAPI の案）
 ├── frontend/      Webアプリ（React）の決定事項、mocks/（画面モック。index.html）
 └── windows/       受付アプリ（C# / WPF）の決定事項、mocks/（画面モック。index.html）
 ```

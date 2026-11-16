@@ -1,0 +1,1492 @@
+openapi: 3.0.3
+info:
+  title: 出欠管理システム Web API
+  version: 0.1.0
+  description: |
+    出欠管理システムの Web API（案）。設計書には API 一覧がないので、機能（4章）・画面（5章）・処理（6章）・DB の操作
+    （[db-schema.md](../engineering/system/db-schema.md) のアクセスパターン）から起こした。
+    **仮の決め**（[N-04〜N-09](../engineering/decisions.md)）を含み、ユーザーの確認はまだ。確認前でも、この案に従って実装してよい。
+
+    各操作の `x-feature-id` は機能ID、`x-screen-id` は画面ID、`x-roles` は呼べるロール、`x-db-access-patterns` は
+    [db-schema.md](../engineering/system/db-schema.md) の「アクセスパターンと操作」の番号。
+
+    ## 認証とロール
+
+    | 呼び出し元 | 認証 |
+    |---|---|
+    | Web | セッション Cookie（`session`）。更新系（POST・PUT）には `X-CSRF-Token` ヘッダも付ける |
+    | 受付アプリ | `Authorization: Bearer <アクセストークン>`。Cookie を使わないので CSRF は対象外 |
+    | 開発中 | `X-Dev-User: <user_id>`（`AUTH_MODE=dev` のときだけ。本番では無効。N-07） |
+
+    - ロールは、トークンを発行したユーザープール（学生用／教員用）で決まる。本人のIDはサーバがトークンから決め、リクエストのIDは信用しない。
+    - 認可: 学生は自分のデータだけ。教員は、担当授業（ClassTeacherMembership）のデータだけ。外れたら 403（`SYSCOMMON_E000101`）。
+
+    ## エラー
+
+    本文は `{ "messageId": "...", "message": "..." }`。文言は [メッセージ台帳](../engineering/catalog/messages.md)。
+
+    | 状況 | HTTP | messageId |
+    |---|---|---|
+    | 未サインイン・セッション失効 | 401 | なし |
+    | 権限なし・担当外 | 403 | `SYSCOMMON_E000101` |
+    | 入力の誤り（修正理由なしなど） | 422 | 機能ごと（例 `A_S0004_E000001`） |
+    | 競合（楽観的排他、学生証の重複） | 409 | `A_S0004_E000002`、`A_S0005_E000001` |
+    | 書き出す記録がない | 404 | `A_F0002_W000001` |
+
+    **申告（`POST /api/v1/reception/touches`）の結果は、成功・申告済み・エラーのどれも HTTP 200 で、`resultDiv`（タッチ結果区分）に入れて返す。**
+    HTTP エラーは、通信・認証・不正なリクエストのときだけ。
+
+    ## ユーザーの作り方（仮の決め。N-04、ENG-009）
+
+    Cognito の標準フローに従う。
+
+    1. 教員が学生を登録する（`POST /api/v1/students`）、または名簿取込で新規の学生が見つかる。
+    2. backend が、先に Cognito（学生用プール）にユーザーを作る。ユーザー名は Microsoft のメールアドレス。Cognito が、仮パスワード付きの招待メールを送る。
+    3. 続けて、DynamoDB に User と Student（学籍番号のロックを含む）を書く。**DBの書き込みに失敗したら、Cognito のユーザーを消す。**
+    4. 本人が、招待メールの仮パスワードで Hosted UI にサインインし、新しいパスワードを決めて、本登録になる。
+    5. 招待の再送は `POST /api/v1/students/{studentId}/invitation`。パスワードを忘れたときは、Hosted UI の標準機能。
+    6. 最初の教員は、管理者が Cognito（教員用プール）に作り、初期データの投入で User と Teacher を作る（設計書11章の未決 #3）。
+
+    ## セッションと CSRF（仮の決め。N-08）
+
+    - Web は、backend が Hosted UI のログイン（認可コード）を受け持つ。トークンを検証して、署名付きのセッション Cookie（HttpOnly・Secure・SameSite=Lax）を発行する。
+    - Cookie は、最終操作から30分で失効する更新型（操作のたびに期限を延ばす）。
+    - 更新系は、CSRF トークンを `X-CSRF-Token` ヘッダで送る（Cookie に入れた値との二重送信）。
+    - 受付アプリは、Cookie を使わず `Authorization: Bearer` で呼ぶ。受付中の授業が終わるまで、アクセストークンを更新して維持する。
+
+    ## API ではないもの
+
+    | ID | 内容 | 実行 |
+    |---|---|---|
+    | A_B0001 | 受付自動締切。受付中で終了時刻を過ぎた授業回を締め切る（`stop` と同じ締切処理）。実行基盤は未決（設計書11章 #8） | 1分ごと |
+    | A_M0001 | 欠課警告メール（希望）。Amazon SES で送る（N-09） | 毎日18:00 |
+servers:
+  - url: https://attendance.example.ac.jp
+    description: 本番（ホスト名は例）
+  - url: http://localhost:3000
+    description: ローカル開発（AUTH_MODE=dev。ポートは例）
+tags:
+  - name: 認証
+    description: サインインとサインアウト（A_A0001）
+  - name: 学生
+    description: 学生の出欠確認（A_S0002）
+  - name: 教員の確認
+    description: 教員の出欠確認（A_S0003）
+  - name: 出欠修正
+    description: 出欠の修正（A_S0004）
+  - name: 学生・学生証
+    description: 学生と学生証の登録（A_S0005）
+  - name: 授業・名簿
+    description: 授業・授業回・受講学生の登録（A_S0006、A_F0001、A_F0002）
+  - name: 受付
+    description: 受付アプリが呼ぶ（A_S0001、A_S0005_SD0002）
+security:
+  - cookieAuth: []
+  - bearerAuth: []
+  - devUserAuth: []
+paths:
+  /auth/login:
+    get:
+      tags: [認証]
+      operationId: authLogin
+      summary: Hosted UI へ移す
+      description: 該当ユーザープールの Hosted UI にリダイレクトする。
+      x-feature-id: A_A0001
+      x-screen-id: A_A0001_SD0001
+      security: []
+      parameters:
+        - name: pool
+          in: query
+          required: true
+          description: ユーザープール。student は学生用、teacher は教員用。
+          schema:
+            type: string
+            enum: [student, teacher]
+      responses:
+        '302':
+          description: Hosted UI へのリダイレクト
+          headers:
+            Location:
+              schema:
+                type: string
+        '400':
+          description: pool が不正
+  /auth/callback:
+    get:
+      tags: [認証]
+      operationId: authCallback
+      summary: Hosted UI から戻る
+      description: 認可コードをトークンに換え、検証して、セッション Cookie（`session`）と CSRF 用の Cookie を発行し、ホーム画面へリダイレクトする。
+      x-feature-id: A_A0001
+      security: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: ホーム画面へのリダイレクト（学生は学生ホーム、教員は教員ホーム）
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/logout:
+    post:
+      tags: [認証]
+      operationId: authLogout
+      summary: サインアウト
+      description: セッションを捨て、Hosted UI のサインアウトへリダイレクトする。
+      x-feature-id: A_A0001
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '302':
+          description: Hosted UI のサインアウトへのリダイレクト
+          headers:
+            Location:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/v1/me:
+    get:
+      tags: [認証]
+      operationId: getMe
+      summary: 本人の名前とロール
+      x-feature-id: A_A0001
+      x-db-access-patterns: [11]
+      responses:
+        '200':
+          description: 本人
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/student/classes:
+    get:
+      tags: [学生]
+      operationId: listStudentClasses
+      summary: 受講授業と欠課時数
+      description: 受講授業ごとの欠課時数・上限・上限までの残り。
+      x-feature-id: A_S0002
+      x-screen-id: A_S0002_SL0001
+      x-roles: [student]
+      x-db-access-patterns: [8]
+      responses:
+        '200':
+          description: 受講授業の一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [classes]
+                properties:
+                  classes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StudentClassSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/student/classes/{classId}/attendances:
+    get:
+      tags: [学生]
+      operationId: listStudentAttendances
+      summary: 授業の日付ごとの出欠
+      x-feature-id: A_S0002
+      x-screen-id: A_S0002_SL0002
+      x-roles: [student]
+      x-db-access-patterns: [8]
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      responses:
+        '200':
+          description: 授業の出欠記録
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [summary, attendances]
+                properties:
+                  summary:
+                    $ref: '#/components/schemas/StudentClassSummary'
+                  attendances:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StudentAttendance'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/teacher/classes:
+    get:
+      tags: [教員の確認]
+      operationId: listTeacherClasses
+      summary: 担当授業
+      x-feature-id: A_S0003
+      x-screen-id: A_S0003_SL0001
+      x-roles: [teacher]
+      x-db-access-patterns: [9]
+      responses:
+        '200':
+          description: 担当授業の一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [classes]
+                properties:
+                  classes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Class'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/teacher/sessions/today:
+    get:
+      tags: [教員の確認]
+      operationId: listTodaySessions
+      summary: 今日の授業回
+      description: 担当授業の今日の授業回。状態と申告人数つき。受付を開始しないまま終了時刻を過ぎた授業回は `notConducted`（未実施）になる。
+      x-feature-id: A_S0003
+      x-screen-id: A_S0003_SL0001
+      x-roles: [teacher]
+      x-db-access-patterns: [9, 5]
+      responses:
+        '200':
+          description: 今日の授業回
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessions]
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TodaySession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/sessions/{sessionId}/attendances:
+    get:
+      tags: [教員の確認]
+      operationId: listSessionAttendances
+      summary: 授業回別の出欠一覧
+      description: 授業回の受講学生全員の出欠と申告時刻。受付中は、画面が定期的に呼んで自動更新する（R-03-4）。
+      x-feature-id: A_S0003
+      x-screen-id: A_S0003_SL0002
+      x-roles: [teacher]
+      x-db-access-patterns: [6, 5]
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: 授業回の出欠
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionAttendanceList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/classes/{classId}/absence-summary:
+    get:
+      tags: [教員の確認]
+      operationId: getAbsenceSummary
+      summary: 学生別の欠課時数
+      description: 授業ごとの学生別の欠課・遅刻・欠課時数・残り。欠課時数は保存せず、出欠から毎回計算する。
+      x-feature-id: A_S0003
+      x-screen-id: A_S0003_SL0003
+      x-roles: [teacher]
+      x-db-access-patterns: [7, 14]
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      responses:
+        '200':
+          description: 学生別の欠課時数
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbsenceSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/sessions/{sessionId}/attendances/{studentId}:
+    put:
+      tags: [出欠修正]
+      operationId: fixAttendance
+      summary: 出欠を修正する
+      description: |
+        出欠区分と理由（必須）、`version` を送る。出欠がまだない（未申告）なら、新しく作る（`version` は 0）。
+        変更前後・理由・修正した教員・日時を、同じトランザクションで修正履歴に残す。
+        理由がなければ 422（`A_S0004_E000001`）、`version` が違えば 409（`A_S0004_E000002`）。
+      x-feature-id: A_S0004
+      x-screen-id: A_S0004_SD0001
+      x-roles: [teacher]
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/StudentId'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttendanceFixRequest'
+            example:
+              attendanceStatus: 10
+              reason: 電車の遅延のため
+              version: 0
+      responses:
+        '200':
+          description: 修正後の出欠
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionAttendance'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /api/v1/students:
+    get:
+      tags: [学生・学生証]
+      operationId: listStudents
+      summary: 学生一覧
+      description: 学生と学生証の状態。`card=none` を付けると、学生証が未登録の学生だけ（受付アプリの学生証登録モード用）。
+      x-feature-id: A_S0005
+      x-screen-id: A_S0005_SL0001
+      x-roles: [teacher]
+      x-db-access-patterns: [15]
+      parameters:
+        - name: card
+          in: query
+          required: false
+          description: none を指定すると、学生証が未登録の学生だけ
+          schema:
+            type: string
+            enum: [none]
+      responses:
+        '200':
+          description: 学生の一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [students]
+                properties:
+                  students:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Student'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [学生・学生証]
+      operationId: createStudent
+      summary: 学生を登録する
+      description: Cognito（学生用プール）にユーザーを作って招待メールを送り、続けて DynamoDB に User と Student を書く。学籍番号が重複していれば 409（メッセージは未定）。
+      x-feature-id: A_S0005
+      x-screen-id: A_S0005_SD0001
+      x-roles: [teacher]
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentCreateRequest'
+      responses:
+        '201':
+          description: 登録した学生
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Student'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/students/{studentId}/invitation:
+    post:
+      tags: [学生・学生証]
+      operationId: resendInvitation
+      summary: 招待メールを再送する
+      description: Cognito の再送機能で、仮パスワード付きの招待メールを送り直す。
+      x-feature-id: A_S0005
+      x-roles: [teacher]
+      parameters:
+        - $ref: '#/components/parameters/StudentId'
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 再送した
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/students/{studentId}/cards:
+    post:
+      tags: [学生・学生証]
+      operationId: registerCard
+      summary: 学生証を登録する
+      description: 受付アプリの学生証登録モードから呼ぶ。別の学生に登録済みの学生証なら 409（`A_S0005_E000001`）。カードIDは画面に出さない。
+      x-feature-id: A_S0005
+      x-screen-id: A_S0005_SD0002
+      x-roles: [teacher]
+      parameters:
+        - $ref: '#/components/parameters/StudentId'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardRegisterRequest'
+      responses:
+        '201':
+          description: 登録した
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/students/{studentId}/cards/invalidate:
+    post:
+      tags: [学生・学生証]
+      operationId: invalidateCard
+      summary: 有効な学生証を無効にする
+      description: 再発行のときに使う。カードIDを URL に出さないため、現在有効な学生証を無効にする形にしている。
+      x-feature-id: A_S0005
+      x-screen-id: A_S0005_SD0001
+      x-roles: [teacher]
+      parameters:
+        - $ref: '#/components/parameters/StudentId'
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 無効にした
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/periods:
+    get:
+      tags: [授業・名簿]
+      operationId: listPeriods
+      summary: 時限
+      description: 各時限の開始・終了時刻。授業回を作るときの選択肢になる。
+      x-feature-id: A_S0006
+      x-roles: [teacher]
+      responses:
+        '200':
+          description: 時限の一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [periods]
+                properties:
+                  periods:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Period'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/classes:
+    post:
+      tags: [授業・名簿]
+      operationId: createClass
+      summary: 授業を登録する
+      description: 科目名・教室・1回あたりの時間数・欠課上限と、授業回の生成条件（曜日・時限・期間。保存しない）を送る。授業回を日付ごとに作り、登録した教員が担当になる（N-14）。
+      x-feature-id: A_S0006
+      x-screen-id: A_S0006_SD0001
+      x-roles: [teacher]
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassCreateRequest'
+      responses:
+        '201':
+          description: 登録した授業と、作った授業回の数
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [class, sessionsCreated]
+                properties:
+                  class:
+                    $ref: '#/components/schemas/Class'
+                  sessionsCreated:
+                    type: integer
+                    example: 18
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/classes/{classId}:
+    get:
+      tags: [授業・名簿]
+      operationId: getClass
+      summary: 授業を取得する
+      x-feature-id: A_S0006
+      x-screen-id: A_S0006_SD0001
+      x-roles: [teacher]
+      x-db-access-patterns: [14]
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      responses:
+        '200':
+          description: 授業
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Class'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [授業・名簿]
+      operationId: updateClass
+      summary: 授業を編集する
+      x-feature-id: A_S0006
+      x-screen-id: A_S0006_SD0001
+      x-roles: [teacher]
+      x-db-access-patterns: [14]
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClassUpdateRequest'
+      responses:
+        '200':
+          description: 編集後の授業
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Class'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/classes/{classId}/sessions:
+    get:
+      tags: [授業・名簿]
+      operationId: listClassSessions
+      summary: 授業回の一覧
+      x-feature-id: A_S0006
+      x-screen-id: A_S0006_SD0002
+      x-roles: [teacher]
+      x-db-access-patterns: [9, 14]
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      responses:
+        '200':
+          description: 授業回の一覧（日時順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessions]
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [授業・名簿]
+      operationId: createMakeupSession
+      summary: 補講の授業回を追加する
+      description: 区分は補講（2）になる。
+      x-feature-id: A_S0006
+      x-screen-id: A_S0006_SD0002
+      x-roles: [teacher]
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionCreateRequest'
+      responses:
+        '201':
+          description: 追加した授業回
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/sessions/{sessionId}:
+    put:
+      tags: [授業・名簿]
+      operationId: updateSession
+      summary: 授業回を編集する
+      description: 休講・補講・時間変更。休講（9）の回は出欠を記録しない。
+      x-feature-id: A_S0006
+      x-screen-id: A_S0006_SD0002
+      x-roles: [teacher]
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionUpdateRequest'
+      responses:
+        '200':
+          description: 編集後の授業回
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/classes/{classId}/enrollments/import:
+    post:
+      tags: [授業・名簿]
+      operationId: importEnrollments
+      summary: 受講学生の名簿を取り込む
+      description: |
+        名簿ファイル（xlsx または CSV UTF-8。列は学籍番号（必須）・氏名・メールアドレス）を取り込む。
+        `mode=preview` は結果の確認だけで、保存しない。`mode=commit` は保存する。
+        誤りが1行でもあれば、どちらも 422（`A_F0001_E000001`）で、保存しない。
+        未登録の学籍番号は、氏名とメールがあれば学生として新規登録し、招待メールを送る。
+      x-feature-id: A_F0001
+      x-screen-id: A_S0006_SD0003
+      x-roles: [teacher]
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+        - $ref: '#/components/parameters/CsrfToken'
+        - name: mode
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [preview, commit]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: 名簿ファイル
+      responses:
+        '200':
+          description: 取り込み結果。preview では確認用、commit では保存した結果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RosterImportResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: 名簿に誤りがある（保存しない）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RosterImportResult'
+  /api/v1/classes/{classId}/export:
+    get:
+      tags: [授業・名簿]
+      operationId: exportAttendance
+      summary: 出欠記録を書き出す（希望）
+      description: |
+        希望機能（F-07）。シート1は授業回×学生の出欠表、シート2は学生別の欠課時数。学籍番号の昇順。
+        ファイル名は `出欠_{科目名}_yyyyMMddHHmmss.xlsx`。書き出す記録がなければ 404（`A_F0002_W000001`）。
+      x-feature-id: A_F0002
+      x-roles: [teacher]
+      x-db-access-patterns: [7]
+      parameters:
+        - $ref: '#/components/parameters/ClassId'
+      responses:
+        '200':
+          description: 出欠記録（xlsx）
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/reception/sessions:
+    get:
+      tags: [受付]
+      operationId: listReceptionSessions
+      summary: 今の時刻に合う担当授業回
+      description: 授業開始の30分前から出す。受付アプリは、先頭を自動で選ぶ。`serverTime` を返すので、アプリは時計のずれを補正して「遅刻まであと○分」を表示する。
+      x-feature-id: A_S0001
+      x-screen-id: A_S0001_SD0001
+      x-roles: [teacher]
+      x-db-access-patterns: [9]
+      responses:
+        '200':
+          description: 授業回の一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [serverTime, sessions]
+                properties:
+                  serverTime:
+                    type: string
+                    format: date-time
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TodaySession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/reception/sessions/{sessionId}/start:
+    post:
+      tags: [受付]
+      operationId: startReception
+      summary: 受付を開始する
+      description: 受付状態を受付中（1）にして、署名付きの受付トークンを返す。受付トークンは保存せず、検証だけで確かめる。
+      x-feature-id: A_S0001
+      x-screen-id: A_S0001_SD0001
+      x-roles: [teacher]
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: 受付トークン
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceptionStartResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/v1/reception/sessions/{sessionId}/stop:
+    post:
+      tags: [受付]
+      operationId: stopReception
+      summary: 受付を終了する
+      description: 受付状態を締切済（2）にして、記録のない受講学生を欠課（入力区分は自動）で登録する。自動締切（A_B0001）も同じ処理。
+      x-feature-id: A_S0001
+      x-screen-id: A_S0001_SD0001
+      x-roles: [teacher]
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: 締切の結果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceptionStopResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/reception/touches:
+    post:
+      tags: [受付]
+      operationId: touchCard
+      summary: 学生証をかざした（申告）
+      description: |
+        サーバが次の順に確かめる。受付中か（締切後は `resultDiv` 9）→ 有効な学生証か（8）→ その授業の受講学生か（7）→ すでに申告済みか（2）→ 判定して登録（1）。
+        すべてのタッチ（エラー含む）をタッチログに残す。判定はサーバ時刻で行う。
+        **結果は、成功・申告済み・エラーのどれも HTTP 200 で返す。**
+      x-feature-id: A_S0001
+      x-screen-id: A_S0001_SD0001
+      x-roles: [teacher]
+      x-db-access-patterns: [1, 2, 3, 4, 5]
+      parameters:
+        - $ref: '#/components/parameters/ReceptionToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TouchRequest'
+      responses:
+        '200':
+          description: 申告の結果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TouchResponse'
+              examples:
+                attended:
+                  summary: 出席
+                  value:
+                    resultDiv: 1
+                    messageId: A_S0001_I000001
+                    message: 青木 一郎さん　出席
+                    attendanceStatus: 10
+                    touchedCount: 32
+                    enrolledCount: 40
+                    serverTime: '2026-11-16T08:55:03+09:00'
+                alreadyTouched:
+                  summary: 申告済み
+                  value:
+                    resultDiv: 2
+                    messageId: A_S0001_I000002
+                    message: 青木 一郎さんは申告済みです
+                    touchedCount: 32
+                    enrolledCount: 40
+                    serverTime: '2026-11-16T08:55:30+09:00'
+                unregistered:
+                  summary: 未登録の学生証
+                  value:
+                    resultDiv: 8
+                    messageId: A_S0001_E000001
+                    message: 登録されていない学生証です。担当の先生に申し出てください
+                    touchedCount: 32
+                    enrolledCount: 40
+                    serverTime: '2026-11-16T08:56:10+09:00'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Web のセッション Cookie（署名付き、HttpOnly・Secure・SameSite=Lax）。更新系は `X-CSRF-Token` も付ける。
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 受付アプリ。Cognito のアクセストークン。
+    devUserAuth:
+      type: apiKey
+      in: header
+      name: X-Dev-User
+      description: 開発用（AUTH_MODE=dev のときだけ）。user_id を送ると、その本人になる。本番では無効。
+  parameters:
+    ClassId:
+      name: classId
+      in: path
+      required: true
+      description: 授業ID（ULID）
+      schema:
+        type: string
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      description: 授業回ID（ULID）
+      schema:
+        type: string
+    StudentId:
+      name: studentId
+      in: path
+      required: true
+      description: 学生ID（user_id と同じ値）
+      schema:
+        type: string
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: false
+      description: Cookie 認証の更新系では必須（Cookie に入れた値との二重送信）。Bearer 認証では不要。
+      schema:
+        type: string
+    ReceptionToken:
+      name: X-Reception-Token
+      in: header
+      required: true
+      description: 受付開始で発行した、署名付きの受付トークン。受付アプリ以外からは申告できないようにする。
+      schema:
+        type: string
+  responses:
+    Unauthorized:
+      description: 未サインイン、またはセッションの失効（本文なし）
+    Forbidden:
+      description: 権限がない、または担当外（SYSCOMMON_E000101）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            messageId: SYSCOMMON_E000101
+            message: この画面を表示する権限がありません
+    NotFound:
+      description: 対象が見つからない（書き出す記録がない場合は A_F0002_W000001）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: 競合（楽観的排他は A_S0004_E000002、学生証の重複は A_S0005_E000001）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            messageId: A_S0004_E000002
+            message: 他の人が先に更新しました。画面を開き直してください
+    ValidationError:
+      description: 入力の誤り（例 A_S0004_E000001）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            messageId: A_S0004_E000001
+            message: 修正理由を入力してください
+  schemas:
+    Error:
+      type: object
+      required: [messageId, message]
+      properties:
+        messageId:
+          type: string
+          example: SYSCOMMON_E000101
+        message:
+          type: string
+    AttendanceStatus:
+      type: integer
+      enum: [10, 20, 30, 40, 50]
+      description: 出欠区分。10 出席、20 遅刻、30 早退、40 欠課、50 公欠（[codes.md](../engineering/catalog/codes.md)）。
+    ReceptionStatus:
+      type: integer
+      enum: [0, 1, 2]
+      description: 受付状態。0 未開始、1 受付中、2 締切済。
+    SessionDiv:
+      type: integer
+      enum: [1, 2, 9]
+      description: 授業回区分。1 通常、2 補講、9 休講。休講の回は出欠を記録しない。
+    ResultDiv:
+      type: integer
+      enum: [1, 2, 7, 8, 9]
+      description: タッチ結果区分。1 受付、2 申告済み、7 受講対象外、8 未登録、9 締切後。
+    Me:
+      type: object
+      required: [userId, name, role]
+      properties:
+        userId:
+          type: string
+          description: Cognito のユーザーID（sub）
+        name:
+          type: string
+          example: 青木 一郎
+        role:
+          type: string
+          enum: [student, teacher]
+    Class:
+      type: object
+      required: [classId, subjectName, roomName, sessionHours, absenceLimitHours]
+      properties:
+        classId:
+          type: string
+        subjectName:
+          type: string
+          example: データベース
+        roomName:
+          type: string
+          example: 3-201
+        sessionHours:
+          type: integer
+          description: 1回あたりの時間数（初期値 2）
+          example: 2
+        absenceLimitHours:
+          type: integer
+          description: 欠課上限（時間）
+          example: 10
+    StudentClassSummary:
+      type: object
+      required: [classId, subjectName, absenceHours, absenceLimitHours, remainingHours]
+      properties:
+        classId:
+          type: string
+        subjectName:
+          type: string
+        absenceHours:
+          type: integer
+          description: 欠課時数。欠課回数 × 1回あたりの時間数 ＋ 遅刻回数を3で割った商。公欠は数えない。
+          example: 9
+        absenceLimitHours:
+          type: integer
+          example: 10
+        remainingHours:
+          type: integer
+          description: 上限までの残り
+          example: 1
+    StudentAttendance:
+      type: object
+      required: [date, attendanceStatus]
+      properties:
+        date:
+          type: string
+          format: date
+        attendanceStatus:
+          allOf:
+            - $ref: '#/components/schemas/AttendanceStatus'
+          nullable: true
+          description: 未申告のとき null
+        touchDatetime:
+          type: string
+          format: date-time
+          nullable: true
+    TodaySession:
+      type: object
+      required: [sessionId, classId, subjectName, roomName, startDatetime, endDatetime, receptionStatus, touchedCount, enrolledCount, notConducted]
+      properties:
+        sessionId:
+          type: string
+        classId:
+          type: string
+        subjectName:
+          type: string
+        roomName:
+          type: string
+        startDatetime:
+          type: string
+          format: date-time
+        endDatetime:
+          type: string
+          format: date-time
+        sessionDiv:
+          $ref: '#/components/schemas/SessionDiv'
+        receptionStatus:
+          $ref: '#/components/schemas/ReceptionStatus'
+        touchedCount:
+          type: integer
+          description: 申告人数
+        enrolledCount:
+          type: integer
+          description: 受講者数
+        notConducted:
+          type: boolean
+          description: 受付を開始しないまま終了時刻を過ぎた（未実施）
+    SessionAttendance:
+      type: object
+      required: [studentId, studentCd, studentName, version]
+      properties:
+        studentId:
+          type: string
+        studentCd:
+          type: string
+          description: 学籍番号
+          example: '2301'
+        studentName:
+          type: string
+        attendanceStatus:
+          allOf:
+            - $ref: '#/components/schemas/AttendanceStatus'
+          nullable: true
+          description: 未申告のとき null
+        touchDatetime:
+          type: string
+          format: date-time
+          nullable: true
+          description: 学生証で申告したサーバ時刻。教員入力・自動のときは null
+        version:
+          type: integer
+          description: 更新バージョン（楽観的排他。出欠がまだないときは 0）
+    SessionAttendanceList:
+      type: object
+      required: [sessionId, subjectName, receptionStatus, touchedCount, enrolledCount, attendances]
+      properties:
+        sessionId:
+          type: string
+        subjectName:
+          type: string
+        startDatetime:
+          type: string
+          format: date-time
+        receptionStatus:
+          $ref: '#/components/schemas/ReceptionStatus'
+        touchedCount:
+          type: integer
+        enrolledCount:
+          type: integer
+        attendances:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionAttendance'
+    AbsenceSummary:
+      type: object
+      required: [classId, sessionHours, absenceLimitHours, rows]
+      properties:
+        classId:
+          type: string
+        sessionHours:
+          type: integer
+        absenceLimitHours:
+          type: integer
+        rows:
+          type: array
+          items:
+            type: object
+            required: [studentId, studentCd, studentName, absentCount, lateCount, absenceHours, remainingHours]
+            properties:
+              studentId:
+                type: string
+              studentCd:
+                type: string
+              studentName:
+                type: string
+              absentCount:
+                type: integer
+              lateCount:
+                type: integer
+              absenceHours:
+                type: integer
+              remainingHours:
+                type: integer
+    AttendanceFixRequest:
+      type: object
+      required: [attendanceStatus, reason, version]
+      properties:
+        attendanceStatus:
+          $ref: '#/components/schemas/AttendanceStatus'
+        reason:
+          type: string
+          description: 修正理由（必須）
+        version:
+          type: integer
+          description: 画面で見ていた更新バージョン
+    Student:
+      type: object
+      required: [studentId, studentCd, studentName, email, cardRegistered]
+      properties:
+        studentId:
+          type: string
+        studentCd:
+          type: string
+        studentName:
+          type: string
+        email:
+          type: string
+          format: email
+          description: ログインID（Microsoft のメールアドレス）
+        cardRegistered:
+          type: boolean
+          description: 有効な学生証が登録されているか
+    StudentCreateRequest:
+      type: object
+      required: [studentCd, studentName, email]
+      properties:
+        studentCd:
+          type: string
+        studentName:
+          type: string
+        email:
+          type: string
+          format: email
+    CardRegisterRequest:
+      type: object
+      required: [cardUid]
+      properties:
+        cardUid:
+          type: string
+          description: 学生証のカードID。画面には出さない。
+    Period:
+      type: object
+      required: [periodSeq, startTm, endTm]
+      properties:
+        periodSeq:
+          type: integer
+          example: 2
+        startTm:
+          type: string
+          example: '09:00'
+        endTm:
+          type: string
+          example: '10:30'
+    ClassCreateRequest:
+      type: object
+      required: [subjectName, roomName, sessionHours, absenceLimitHours, schedule]
+      properties:
+        subjectName:
+          type: string
+        roomName:
+          type: string
+        sessionHours:
+          type: integer
+          example: 2
+        absenceLimitHours:
+          type: integer
+          example: 10
+        schedule:
+          type: object
+          description: 授業回の生成条件。授業には保存しない。
+          required: [dayDiv, periodSeq, startDt, endDt]
+          properties:
+            dayDiv:
+              type: integer
+              minimum: 1
+              maximum: 5
+              description: 曜日区分。1 月〜5 金
+            periodSeq:
+              type: integer
+            startDt:
+              type: string
+              format: date
+            endDt:
+              type: string
+              format: date
+    ClassUpdateRequest:
+      type: object
+      required: [subjectName, roomName, sessionHours, absenceLimitHours]
+      properties:
+        subjectName:
+          type: string
+        roomName:
+          type: string
+        sessionHours:
+          type: integer
+        absenceLimitHours:
+          type: integer
+    Session:
+      type: object
+      required: [sessionId, classId, startDatetime, endDatetime, sessionDiv, receptionStatus]
+      properties:
+        sessionId:
+          type: string
+        classId:
+          type: string
+        startDatetime:
+          type: string
+          format: date-time
+        endDatetime:
+          type: string
+          format: date-time
+        sessionDiv:
+          $ref: '#/components/schemas/SessionDiv'
+        receptionStatus:
+          $ref: '#/components/schemas/ReceptionStatus'
+    SessionCreateRequest:
+      type: object
+      required: [startDatetime, endDatetime]
+      properties:
+        startDatetime:
+          type: string
+          format: date-time
+        endDatetime:
+          type: string
+          format: date-time
+    SessionUpdateRequest:
+      type: object
+      required: [startDatetime, endDatetime, sessionDiv]
+      properties:
+        startDatetime:
+          type: string
+          format: date-time
+        endDatetime:
+          type: string
+          format: date-time
+        sessionDiv:
+          $ref: '#/components/schemas/SessionDiv'
+    RosterImportResult:
+      type: object
+      required: [canCommit, rows]
+      properties:
+        canCommit:
+          type: boolean
+          description: 誤りがなく、保存できる
+        rows:
+          type: array
+          items:
+            type: object
+            required: [row, result]
+            properties:
+              row:
+                type: integer
+                description: 名簿の行番号
+              studentCd:
+                type: string
+              studentName:
+                type: string
+              result:
+                type: string
+                enum: [existing, new, error]
+                description: existing は登録済みの学生、new は新規登録（招待メールを送る）、error は誤り
+              messageId:
+                type: string
+                description: 誤りのとき A_F0001_E000001
+              message:
+                type: string
+                description: 誤りのとき「名簿の{行}行目：{内容}」
+        registeredCount:
+          type: integer
+          description: commit のとき、受講学生として登録した人数
+        invitedCount:
+          type: integer
+          description: commit のとき、招待メールを送った（新規登録した）人数
+    ReceptionStartResponse:
+      type: object
+      required: [sessionId, receptionToken, serverTime]
+      properties:
+        sessionId:
+          type: string
+        receptionToken:
+          type: string
+          description: 署名付きの受付トークン。授業回ID と期限が入っている。
+        serverTime:
+          type: string
+          format: date-time
+    ReceptionStopResponse:
+      type: object
+      required: [touchedCount, enrolledCount, autoAbsentCount]
+      properties:
+        touchedCount:
+          type: integer
+        enrolledCount:
+          type: integer
+        autoAbsentCount:
+          type: integer
+          description: 記録がないので、欠課（自動）で登録した人数
+    TouchRequest:
+      type: object
+      required: [sessionId, cardUid]
+      properties:
+        sessionId:
+          type: string
+        cardUid:
+          type: string
+          description: 学生証のカードID。画面には出さない。
+    TouchResponse:
+      type: object
+      required: [resultDiv, messageId, message, touchedCount, enrolledCount, serverTime]
+      properties:
+        resultDiv:
+          $ref: '#/components/schemas/ResultDiv'
+        messageId:
+          type: string
+          description: メッセージ台帳のID
+        message:
+          type: string
+          description: 画面に出す文言
+        attendanceStatus:
+          allOf:
+            - $ref: '#/components/schemas/AttendanceStatus'
+          description: 登録できたときだけ返す
+        touchedCount:
+          type: integer
+          description: 申告人数
+        enrolledCount:
+          type: integer
+          description: 受講者数
+        serverTime:
+          type: string
+          format: date-time

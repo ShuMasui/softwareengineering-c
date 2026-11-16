@@ -7,6 +7,7 @@
 | [basic-design.md](basic-design.md) | 提出版の基本設計書。固定で、書き換えない |
 | [decisions.md](decisions.md) | 共有の決定事項のログと、設計書11章の未決事項の状況 |
 | [repo-structure.md](repo-structure.md) | リポジトリ構成とローカル開発の案 |
+| [infra.md](infra.md) | インフラ（Terraform）と、apply の workflow |
 | [system/db-schema.md](system/db-schema.md) | テーブル・ビューの定義、制約、共通項目 |
 | [system/domain-model.md](system/domain-model.md) | 用語、エンティティと関連、判定ルール、状態 |
 | [catalog/](catalog/README.md) | 画面に出す文言とコード値の台帳 |

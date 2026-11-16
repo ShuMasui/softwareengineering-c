@@ -40,5 +40,5 @@ Web API と、サーバ側の処理（認証・バッチ・メール・ファイ
 ## 関連文書
 
 - 共有: [DBスキーマ](../engineering/system/db-schema.md)、[ドメインモデル](../engineering/system/domain-model.md)、[メッセージ台帳](../engineering/catalog/messages.md)、[コード台帳](../engineering/catalog/codes.md)
-- [api.md](api.md): API一覧（案）、ユーザーの作り方、セッションと CSRF
+- [api.yml](api.yml): API仕様（OpenAPI 3.0。案）。ユーザーの作り方、セッションと CSRF も冒頭の説明に書いてある
 - 決定事項: [decisions.md](decisions.md)
