@@ -31,5 +31,6 @@
 
 ## 関連文書
 
+- [mocks/index.html](mocks/index.html): 受付アプリ2画面の簡易モック（受付の状態10種、学生証登録モード3種）
 - 共有: [ドメインモデル](../engineering/system/domain-model.md)、[メッセージ台帳](../engineering/catalog/messages.md)、[コード台帳](../engineering/catalog/codes.md)
 - 決定事項: [decisions.md](decisions.md)

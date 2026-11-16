@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>出欠管理 UIモック（簡易）</title>
+<style>
+  body { font-family: system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif; margin: 0; background: #f3f4f6; color: #111; }
+  header { background: #1f2937; color: #fff; padding: 12px 16px; }
+  header h1 { margin: 0; font-size: 18px; }
+  header p { margin: 4px 0 0; font-size: 12px; color: #d1d5db; }
+  nav { padding: 8px 16px; background: #fff; border-bottom: 1px solid #ddd; font-size: 13px; line-height: 2; }
+  nav a { margin-right: 12px; white-space: nowrap; }
+  main { max-width: 920px; margin: 0 auto; padding: 16px; }
+  section.screen { background: #fff; border: 1px solid #ccc; border-radius: 6px; margin: 0 0 24px; padding: 16px; }
+  section.screen > h2 { margin: 0; font-size: 17px; }
+  .id { color: #666; font-size: 12px; margin: 2px 0 12px; }
+  .bar { display: flex; justify-content: space-between; background: #e5e7eb; padding: 6px 10px; border-radius: 4px; font-size: 13px; margin-bottom: 12px; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; font-size: 14px; }
+  th { background: #f3f4f6; }
+  tr.warn td { background: #fef3c7; }
+  tr.danger td { background: #fee2e2; }
+  .btn, button { display: inline-block; padding: 6px 12px; border: 1px solid #6b7280; border-radius: 4px; background: #fff; color: #111; font-size: 14px; text-decoration: none; cursor: pointer; }
+  .btn.primary, button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .note { font-size: 12px; color: #555; margin: 8px 0; }
+  .msg { padding: 8px 10px; border-radius: 4px; font-size: 13px; margin: 8px 0; }
+  .msg.err { background: #fee2e2; border: 1px solid #ef4444; }
+  .msg.info { background: #dbeafe; border: 1px solid #3b82f6; }
+  label { display: block; margin: 10px 0 2px; font-size: 13px; }
+  input, select, textarea { padding: 6px; font-size: 14px; border: 1px solid #9ca3af; border-radius: 4px; min-width: 240px; box-sizing: border-box; }
+  textarea { width: 100%; min-height: 70px; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; }
+  .ok { background: #d1fae5; } .late { background: #fef3c7; } .abs { background: #fee2e2; } .none { background: #e5e7eb; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>出欠管理システム UIモック（簡易）</h1>
+  <p>Webアプリの12画面。見た目と画面の流れの確認用で、動作はしない。画面IDは設計書5章のとおり。</p>
+</header>
+<nav>
+  <strong>共通</strong> <a href="#A_A0001_SD0001">サインイン</a>
+  ｜ <strong>学生</strong> <a href="#A_S0002_SL0001">学生ホーム</a><a href="#A_S0002_SL0002">授業別出欠記録</a>
+  ｜ <strong>教員</strong> <a href="#A_S0003_SL0001">教員ホーム</a><a href="#A_S0003_SL0002">授業回別出欠一覧</a><a href="#A_S0003_SL0003">学生別欠課時数一覧</a><a href="#A_S0004_SD0001">出欠修正</a><a href="#A_S0005_SL0001">学生一覧</a><a href="#A_S0005_SD0001">学生登録</a><a href="#A_S0006_SD0001">授業登録・編集</a><a href="#A_S0006_SD0002">授業回編集</a><a href="#A_S0006_SD0003">受講学生登録</a>
+</nav>
+<main>
+
+<!-- 1 -->
+<section class="screen" id="A_A0001_SD0001">
+  <h2>サインイン</h2>
+  <div class="id">A_A0001_SD0001 ／ 全員</div>
+  <p style="font-size:20px;margin:16px 0">出欠管理システム</p>
+  <p>
+    <a class="btn primary" href="#A_S0002_SL0001">学生としてサインイン</a>
+    <a class="btn primary" href="#A_S0003_SL0001">教員としてサインイン</a>
+  </p>
+  <p class="note">ボタンを押すと Cognito の Hosted UI（学生用／教員用）に移る。初めての人は、招待メールの仮パスワードでサインインし、新しいパスワードを決める（ENG-009）。</p>
+</section>
+
+<!-- 2 -->
+<section class="screen" id="A_S0002_SL0001">
+  <h2>学生ホーム（受講授業一覧）</h2>
+  <div class="id">A_S0002_SL0001 ／ 学生</div>
+  <div class="bar"><span>出欠管理</span><span>青木 一郎（学生）　<a href="#A_A0001_SD0001">サインアウト</a></span></div>
+  <table>
+    <tr><th>授業</th><th>欠課時数</th><th>上限</th><th>上限までの残り</th></tr>
+    <tr class="warn"><td><a href="#A_S0002_SL0002">ソフトウェア工学</a></td><td>9</td><td>10</td><td>1 時間</td></tr>
+    <tr><td><a href="#A_S0002_SL0002">データベース</a></td><td>2</td><td>10</td><td>8 時間</td></tr>
+    <tr><td><a href="#A_S0002_SL0002">情報ネットワーク</a></td><td>0</td><td>8</td><td>8 時間</td></tr>
+  </table>
+  <p class="note">残りが少ない授業は黄色で強調する。</p>
+</section>
+
+<!-- 3 -->
+<section class="screen" id="A_S0002_SL0002">
+  <h2>授業別出欠記録</h2>
+  <div class="id">A_S0002_SL0002 ／ 学生</div>
+  <div class="bar"><span>出欠管理</span><span>青木 一郎（学生）　<a href="#A_A0001_SD0001">サインアウト</a></span></div>
+  <p><a href="#A_S0002_SL0001">← 受講授業一覧</a></p>
+  <p><strong>データベース</strong>　欠課時数 2 ／ 上限 10 ／ 残り 8 時間</p>
+  <table>
+    <tr><th>日付</th><th>出欠</th><th>申告時刻</th></tr>
+    <tr><td>2026-10-05</td><td><span class="tag ok">出席</span></td><td>08:58</td></tr>
+    <tr><td>2026-10-12</td><td><span class="tag late">遅刻</span></td><td>09:07</td></tr>
+    <tr><td>2026-10-19</td><td><span class="tag abs">欠課</span></td><td>—</td></tr>
+    <tr><td>2026-10-26</td><td><span class="tag none">公欠</span></td><td>—</td></tr>
+    <tr><td>2026-11-02</td><td><span class="tag ok">出席</span></td><td>08:55</td></tr>
+  </table>
+</section>
+
+<!-- 4 -->
+<section class="screen" id="A_S0003_SL0001">
+  <h2>教員ホーム（担当授業一覧）</h2>
+  <div class="id">A_S0003_SL0001 ／ 教員</div>
+  <div class="bar"><span>出欠管理</span><span>佐藤 先生（教員）　<a href="#A_A0001_SD0001">サインアウト</a></span></div>
+  <h3 style="font-size:15px">今日の授業回</h3>
+  <table>
+    <tr><th>時限</th><th>授業</th><th>教室</th><th>状態</th><th></th></tr>
+    <tr><td>2限 09:00-10:30</td><td>データベース</td><td>3-201</td><td>受付中（32 / 40）</td><td><a class="btn" href="#A_S0003_SL0002">出欠一覧</a></td></tr>
+    <tr><td>1限 08:50-09:35</td><td>情報ネットワーク</td><td>3-105</td><td><span class="tag none">未実施</span>（受付を開始しなかった）</td><td><a class="btn" href="#A_S0003_SL0002">出欠一覧</a></td></tr>
+  </table>
+  <h3 style="font-size:15px">担当授業</h3>
+  <table>
+    <tr><th>授業</th><th></th></tr>
+    <tr><td>データベース</td><td><a class="btn" href="#A_S0003_SL0003">欠課時数一覧</a> <a class="btn" href="#A_S0006_SD0001">授業編集</a> <a class="btn" href="#A_S0006_SD0002">授業回編集</a> <a class="btn" href="#A_S0006_SD0003">受講学生登録</a></td></tr>
+    <tr><td>情報ネットワーク</td><td><a class="btn" href="#A_S0003_SL0003">欠課時数一覧</a> <a class="btn" href="#A_S0006_SD0001">授業編集</a> <a class="btn" href="#A_S0006_SD0002">授業回編集</a> <a class="btn" href="#A_S0006_SD0003">受講学生登録</a></td></tr>
+  </table>
+  <p><a class="btn" href="#A_S0005_SL0001">学生一覧</a> <a class="btn" href="#A_S0006_SD0001">授業を登録</a></p>
+  <p class="note">受付の開始・終了は、教室PCの受付アプリで行う。</p>
+</section>
+
+<!-- 5 -->
+<section class="screen" id="A_S0003_SL0002">
+  <h2>授業回別出欠一覧</h2>
+  <div class="id">A_S0003_SL0002 ／ 教員</div>
+  <div class="bar"><span>出欠管理</span><span>佐藤 先生（教員）　<a href="#A_A0001_SD0001">サインアウト</a></span></div>
+  <p><a href="#A_S0003_SL0001">← 教員ホーム</a></p>
+  <p><strong>データベース</strong>　2026-11-16 2限　3-201　<span class="tag ok">受付中</span>　申告 <strong>32 / 40</strong>　<span class="note">（自動更新中）</span></p>
+  <table>
+    <tr><th>学籍番号</th><th>氏名</th><th>出欠</th><th>申告時刻</th><th></th></tr>
+    <tr><td>2301</td><td>青木 一郎</td><td><span class="tag ok">出席</span></td><td>08:55</td><td><a class="btn" href="#A_S0004_SD0001">修正</a></td></tr>
+    <tr><td>2302</td><td>伊藤 花子</td><td><span class="tag late">遅刻</span></td><td>09:08</td><td><a class="btn" href="#A_S0004_SD0001">修正</a></td></tr>
+    <tr><td>2303</td><td>上田 健</td><td><span class="tag none">未申告</span></td><td>—</td><td><a class="btn" href="#A_S0004_SD0001">修正</a></td></tr>
+    <tr><td>2304</td><td>遠藤 美咲</td><td><span class="tag ok">出席</span></td><td>08:57</td><td><a class="btn" href="#A_S0004_SD0001">修正</a></td></tr>
+  </table>
+</section>
+
+<!-- 6 -->
+<section class="screen" id="A_S0003_SL0003">
+  <h2>学生別欠課時数一覧</h2>
+  <div class="id">A_S0003_SL0003 ／ 教員</div>
+  <div class="bar"><span>出欠管理</span><span>佐藤 先生（教員）　<a href="#A_A0001_SD0001">サインアウト</a></span></div>
+  <p><a href="#A_S0003_SL0001">← 教員ホーム</a></p>
+  <p><strong>データベース</strong>　上限 10 時間 ／ 1回 2 時間　<button type="button">Excel で書き出し（希望機能）</button></p>
+  <table>
+    <tr><th>学籍番号</th><th>氏名</th><th>欠課</th><th>遅刻</th><th>欠課時数</th><th>残り</th></tr>
+    <tr><td>2301</td><td>青木 一郎</td><td>1</td><td>0</td><td>2</td><td>8</td></tr>
+    <tr><td>2302</td><td>伊藤 花子</td><td>1</td><td>3</td><td>3</td><td>7</td></tr>
+    <tr class="warn"><td>2303</td><td>上田 健</td><td>4</td><td>2</td><td>8</td><td>2</td></tr>
+    <tr class="danger"><td>2304</td><td>遠藤 美咲</td><td>4</td><td>3</td><td>9</td><td>1</td></tr>
+  </table>
+  <p class="note">欠課時数 ＝ 欠課 × 2 ＋ 遅刻 ÷ 3（商）。残りが少ない学生を強調する。</p>
+</section>
+
+<!-- 7 -->
+<section class="screen" id="A_S0004_SD0001">
+  <h2>出欠修正</h2>
+  <div class="id">A_S0004_SD0001 ／ 教員</div>
+  <div class="bar"><span>出欠管理</span><span>佐藤 先生（教員）　<a href="#A_A0001_SD0001">サインアウト</a></span></div>
+  <p><a href="#A_S0003_SL0002">← 授業回別出欠一覧</a></p>
+  <p>データベース　2026-11-16 2限　／　2302 伊藤 花子　／　いまの出欠: <span class="tag late">遅刻</span></p>
+  <label for="st">新しい出欠</label>
+  <select id="st"><option>出席</option><option selected>遅刻</option><option>早退</option><option>欠課</option><option>公欠</option></select>
+  <label for="rs">修正理由（必須）</label>
+  <textarea id="rs"></textarea>
+  <div class="msg err">修正理由を入力してください <small>（A_S0004_E000001。理由が空のときの表示例）</small></div>
+  <p><button class="primary" type="button">修正する</button> <a class="btn" href="#A_S0003_SL0002">戻る</a></p>
+  <p class="note">修正すると、変更前後・理由・修正した教員・日時が履歴に残る。</p>
+</section>
+
+<!-- 8 -->
+<section class="screen" id="A_S0005_SL0001">
+  <h2>学生一覧</h2>
+  <div class="id">A_S0005_SL0001 ／ 教員</div>
+  <div class="bar"><span>出欠管理</span><span>佐藤 先生（教員）　<a href="#A_A0001_SD0001">サインアウト</a></span></div>
+  <p><a href="#A_S0003_SL0001">← 教員ホーム</a>　<a class="btn primary" href="#A_S0005_SD0001">学生を登録</a></p>
+  <table>
+    <tr><th>学籍番号</th><th>氏名</th><th>メールアドレス</th><th>学生証</th><th></th></tr>
+    <tr><td>2301</td><td>青木 一郎</td><td>s2301@example.ac.jp</td><td><span class="tag ok">登録済み</span></td><td><a class="btn" href="#A_S0005_SD0001">開く</a></td></tr>
+    <tr><td>2302</td><td>伊藤 花子</td><td>s2302@example.ac.jp</td><td><span class="tag ok">登録済み</span></td><td><a class="btn" href="#A_S0005_SD0001">開く</a></td></tr>
+    <tr><td>2303</td><td>上田 健</td><td>s2303@example.ac.jp</td><td><span class="tag none">未登録</span></td><td><a class="btn" href="#A_S0005_SD0001">開く</a></td></tr>
+  </table>
+  <p class="note">学生証の登録は、教室PCの受付アプリの「学生証登録モード」で行う。</p>
+</section>
+
+<!-- 9 -->
+<section class="screen" id="A_S0005_SD0001">
+  <h2>学生登録</h2>
+  <div class="id">A_S0005_SD0001 ／ 教員</div>
+  <div class="bar"><span>出欠管理</span><span>佐藤 先生（教員）　<a href="#A_A0001_SD0001">サインアウト</a></span></div>
+  <p><a href="#A_S0005_SL0001">← 学生一覧</a></p>
+  <label for="cd">学籍番号</label><input id="cd" value="2305">
+  <label for="nm">氏名</label><input id="nm" value="小川 太郎">
+  <label for="ml">メールアドレス（ログインID）</label><input id="ml" value="s2305@example.ac.jp">
+  <p><button class="primary" type="button">登録する</button></p>
+  <div class="msg info">登録すると、Cognito から仮パスワード付きの招待メールが届く。本人が初回サインインでパスワードを決めて、本登録になる。</div>
+  <h3 style="font-size:15px;margin-top:20px">学生証（2301 青木 一郎の場合）</h3>
+  <p>登録済み　<button type="button">この学生証を無効にする</button></p>
+  <div class="msg err">この学生証は別の学生に登録済みです <small>（A_S0005_E000001。重複して登録したときの表示例）</small></div>
+</section>
+
+<!-- 10 -->
+<section class="screen" id="A_S0006_SD0001">
+  <h2>授業登録・編集</h2>
+  <div class="id">A_S0006_SD0001 ／ 教員</div>
+  <div class="bar"><span>出欠管理</span><span>佐藤 先生（教員）　<a href="#A_A0001_SD0001">サインアウト</a></span></div>
+  <p><a href="#A_S0003_SL0001">← 教員ホーム</a></p>
+  <label for="sj">科目名</label><input id="sj" value="データベース">
+  <label for="rm">教室</label><input id="rm" value="3-201">
+  <div class="row">
+    <div><label for="sh">1回あたりの時間数</label><input id="sh" value="2" style="min-width:100px"></div>
+    <div><label for="lm">欠課上限（時間）</label><input id="lm" value="10" style="min-width:100px"></div>
+  </div>
+  <h3 style="font-size:15px;margin-top:20px">授業回の生成条件（保存はしない）</h3>
+  <div class="row">
+    <div><label for="dy">曜日</label><select id="dy"><option>月</option><option selected>火</option><option>水</option><option>木</option><option>金</option></select></div>
+    <div><label for="pr">時限</label><select id="pr"><option>1限</option><option selected>2限（09:00-10:30）</option><option>3限</option></select></div>
+    <div><label for="sd">期間（開始）</label><input id="sd" type="date" value="2026-10-05"></div>
+    <div><label for="ed">期間（終了）</label><input id="ed" type="date" value="2027-02-02"></div>
+  </div>
+  <p><button class="primary" type="button">登録して授業回を作る</button></p>
+  <p class="note">曜日・時限・期間から、授業回を日付ごとに作る。作ったあとの休講・補講・時間変更は「授業回編集」で行う。</p>
+</section>
+
+<!-- 11 -->
+<section class="screen" id="A_S0006_SD0002">
+  <h2>授業回編集</h2>
+  <div class="id">A_S0006_SD0002 ／ 教員</div>
+  <div class="bar"><span>出欠管理</span><span>佐藤 先生（教員）　<a href="#A_A0001_SD0001">サインアウト</a></span></div>
+  <p><a href="#A_S0003_SL0001">← 教員ホーム</a></p>
+  <p><strong>データベース</strong></p>
+  <table>
+    <tr><th>日付</th><th>開始</th><th>終了</th><th>区分</th><th></th></tr>
+    <tr><td>2026-11-10</td><td><input value="09:00" style="min-width:80px"></td><td><input value="10:30" style="min-width:80px"></td><td><select><option selected>通常</option><option>補講</option><option>休講</option></select></td><td><button type="button">保存</button></td></tr>
+    <tr><td>2026-11-17</td><td><input value="09:00" style="min-width:80px"></td><td><input value="10:30" style="min-width:80px"></td><td><select><option>通常</option><option>補講</option><option selected>休講</option></select></td><td><button type="button">保存</button></td></tr>
+    <tr><td>2026-11-20</td><td><input value="13:00" style="min-width:80px"></td><td><input value="14:30" style="min-width:80px"></td><td><select><option>通常</option><option selected>補講</option><option>休講</option></select></td><td><button type="button">保存</button></td></tr>
+  </table>
+  <p><button type="button">補講の授業回を追加</button></p>
+  <p class="note">休講の回は出欠を記録しない。</p>
+</section>
+
+<!-- 12 -->
+<section class="screen" id="A_S0006_SD0003">
+  <h2>受講学生登録</h2>
+  <div class="id">A_S0006_SD0003 ／ 教員</div>
+  <div class="bar"><span>出欠管理</span><span>佐藤 先生（教員）　<a href="#A_A0001_SD0001">サインアウト</a></span></div>
+  <p><a href="#A_S0003_SL0001">← 教員ホーム</a></p>
+  <p><strong>データベース</strong></p>
+  <label for="fl">名簿ファイル（xlsx または CSV）</label>
+  <input id="fl" type="file"> <button type="button">取り込む</button>
+  <p class="note">列は 学籍番号（必須）・氏名・メールアドレス。未登録の学籍番号は、氏名とメールがあれば学生として新規登録し、招待メールを送る。</p>
+  <h3 style="font-size:15px">取り込み結果</h3>
+  <table>
+    <tr><th>行</th><th>学籍番号</th><th>氏名</th><th>結果</th></tr>
+    <tr><td>2</td><td>2301</td><td>青木 一郎</td><td>登録済みの学生</td></tr>
+    <tr><td>3</td><td>（空）</td><td>江口 優</td><td><span class="tag abs">誤り</span></td></tr>
+    <tr><td>4</td><td>2306</td><td>岡田 結衣</td><td>新規登録</td></tr>
+  </table>
+  <div class="msg err">名簿の3行目：学籍番号がありません <small>（A_F0001_E000001）</small></div>
+  <p><button class="primary" type="button" disabled>保存する</button> <span class="note">誤りが1行でもあれば保存しない。</span></p>
+</section>
+
+</main>
+</body>
+</html>

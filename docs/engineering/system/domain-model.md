@@ -47,7 +47,7 @@ flowchart LR
 | User | AR | サインインするユーザー。ログインIDは Microsoft のメールアドレス（ENG-003） | なし（新規） |
 | Student | AR | 学生。User を参照する | student_mst |
 | Teacher | AR | 教員。User を参照する | teacher_mst |
-| Class | AR | 授業（科目名・曜日・時限・教室・期間・1回あたりの時間数・欠課上限） | course_mst |
+| Class | AR | 授業（科目名・教室・1回あたりの時間数・欠課上限）。曜日・時限・期間は授業回を作るときの入力で、授業には持たない（ENG-008） | course_mst |
 | StudentClassMembership | AR | 学生がその授業を受講していること。Student と Class を参照する | enrollment_mst |
 | ClassTeacherMembership | AR | 教員がその授業を担当していること。Teacher と Class を参照する | なし（新規）。提出版は course_mst.teacher_id で担当教員は1人 |
 | AttendanceSession | AR | 授業1回分の出欠の受付。Class を参照し、Attendance を持つ | class_session_trn（授業回）。受付状態もここにある |
@@ -78,7 +78,7 @@ flowchart LR
 
 | 用語 | 意味 |
 |---|---|
-| 授業（Class） | 科目名・曜日・時限・教室・期間・担当教員を持つ開講単位 |
+| 授業（Class） | 科目名・教室・1回あたりの時間数・欠課上限を持つ開講単位。担当教員は ClassTeacherMembership で結ぶ |
 | 授業回（AttendanceSession） | ある日のある授業1回。出欠は授業回ごとに記録する。授業登録時に期間と曜日から自動生成し、休講・補講・時間変更を編集できる |
 | 受講（StudentClassMembership） | 授業と学生の組 |
 | 担当（ClassTeacherMembership） | 授業と教員の組。1つの授業に複数の教員がいてよい |

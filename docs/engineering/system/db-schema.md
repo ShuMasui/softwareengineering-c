@@ -1,141 +1,112 @@
 # DBスキーマ
 
-出典: [基本設計書](../basic-design.md) 7章・8章。次の2つの裁定を反映している（[決定ログ](../decisions.md)）。
+出典: [基本設計書](../basic-design.md) 7章・8章を元に、次の裁定を反映した（[決定ログ](../decisions.md)）。
 
-- DBを MySQL から **Amazon DynamoDB** に変える（ENG-001）
-- ドメインモデルは、ユーザーが示した図を使う（ENG-006。[domain-model.md](domain-model.md)）
+- DBは Amazon DynamoDB（ENG-001）
+- ドメインモデルは図のとおり（ENG-006。[domain-model.md](domain-model.md)）
+- 詳細の項目は自由に決めてよいが、1エンティティにつき**キー以外5つ以内**（ENG-008）
 
-この文書は**論理スキーマ**（エンティティ・項目・制約・ルール）を定める。DynamoDB のテーブル構成・キー・GSI（物理設計）は未決（N-01）。提出版に書かれていない項目は「**未定**」と書いてある。決めたら、この文書を更新し、`../decisions.md` に記録する。
+**この文書の「DynamoDB の形」は確定**（[ENG-010](../decisions.md)）。提出版の項目は、上の方針で絞っている（「提出版との差」を参照）。
 
 ## 方針
 
-- エンティティの名前は、提出版の物理名（`teacher_mst` など）を引き続き使う。DynamoDB 上のテーブル名・構成は未決。提出版にないエンティティ（User、ClassTeacherMembership）は、ドメインモデルでの名前で書き、物理名は未定。
-- **欠課時数は保存しない。** 出欠から backend が毎回計算する（下の「欠課時数の集計」）。
-- 排他制御は楽観的排他。`last_update_version` を条件に付けた更新で行う。
-- 文字コードは UTF-8。
+- テーブルは1つ（単一テーブル設計）。名前は `attendance_app`。
+- キーは `PK` `SK`。GSI は `GSI1`（`GSI1PK` `GSI1SK`）と `GSI2`（`GSI2PK` `GSI2SK`）の2つ。キーの項目はすべて文字列。
+- キー以外の項目は、1エンティティ5つ以内。共通項目（作成者・作成日時・更新者・更新日時・削除フラグ）は持たない。削除は物理削除。
+- 楽観的排他の `last_update_version` は、修正が競合する出欠（Attendance）だけが持つ。
+- **欠課時数は保存しない。** backend が出欠から毎回計算する（下の「欠課時数の集計」）。
+- ID: `user_id` は Cognito のユーザーID（sub）。学生・教員のIDは `user_id` と同じ値にする。授業・授業回は ULID を backend で作る。
+- 日時: ISO 8601 の文字列、日本時間（例 `2026-11-16T09:00:00+09:00`）。時刻だけの項目は `HH:mm`。
+- 区分: 数値。値は [codes.md](../catalog/codes.md)。
 
-## 提出版（MySQL）からの読み替え
+## DynamoDB の形
 
-| 提出版 | DynamoDB では |
-|---|---|
-| 外部キー（FK） | DBは守らない。参照先が存在するかは backend が確かめる |
-| 一意制約（UK） | キーの設計か、条件付き書き込み・トランザクションで守る |
-| ビュー `absence_summary_v` | ない。backend が計算する（N-02） |
-| 自動採番の bigint の ID | ない。IDは backend が作る（方法は未決。N-03） |
-| データ型（bigint・integer・varchar・datetime） | 数値（N）と文字列（S）。日時の持ち方は未定 |
-| インデックス | テーブルのキーと GSI（グローバルセカンダリインデックス）。未決 |
-| SQL・プリペアドステートメント | SQLを使わない。PartiQL を使う場合はパラメータ付きにする |
+`{...}` は値が入る場所。キー以外の項目は右から2列目、その数は右端。
 
-## 共通項目
+| エンティティ（ドメインモデル） | PK | SK | GSI1（PK / SK） | GSI2（PK / SK） | キー以外の項目 | 数 |
+|---|---|---|---|---|---|---|
+| ユーザー（User） | `USER#{user_id}` | `#META` | — | — | email | 1 |
+| 学生（Student） | `STUDENT#{user_id}` | `#META` | `ALL_STUDENT` / `{student_cd}` | — | student_cd, student_name | 2 |
+| 教員（Teacher） | `TEACHER#{user_id}` | `#META` | — | — | teacher_name | 1 |
+| 授業（Class） | `CLASS#{class_id}` | `#META` | `ALL_CLASS` / `{class_id}` | — | subject_name, room_name, session_hours, absence_limit_hours | 4 |
+| 担当（ClassTeacherMembership） | `CLASS#{class_id}` | `TEACHER#{teacher_id}` | `TEACHER#{teacher_id}` / `CLASS#{class_id}` | — | なし | 0 |
+| 受講（StudentClassMembership） | `CLASS#{class_id}` | `STUDENT#{student_id}` | `STUDENT#{student_id}` / `CLASS#{class_id}` | — | なし | 0 |
+| 授業回（AttendanceSession） | `SESSION#{session_id}` | `#META` | `CLASS#{class_id}` / `SESSION#{start_datetime}#{session_id}` | `RECEIVING` / `{end_datetime}`（受付中のときだけ付ける） | class_id, start_datetime, end_datetime, session_div, reception_status | 5 |
+| 出欠（Attendance） | `SESSION#{session_id}` | `STUDENT#{student_id}` | `STUDENT#{student_id}` / `ATT#{class_id}#{start_datetime}` | `CLASS#{class_id}` / `ATT#{student_id}#{start_datetime}` | class_id, attendance_status, touch_datetime, input_div, last_update_version | 5 |
+| 学生証（図にない。ENG-007） | `STUDENT#{student_id}` | `CARD#{card_uid}` | — | — | valid_flg, invalid_datetime | 2 |
+| 有効な学生証の検索・ロック | `CARD#{card_uid}` | `#VALID` | — | — | student_id | 1 |
+| 学籍番号のロック | `STUDENTCD#{student_cd}` | `#LOCK` | — | — | student_id | 1 |
+| 時限（図にない。ENG-007） | `PERIOD#{period_seq}` | `#META` | — | — | start_tm, end_tm | 2 |
+| 出欠修正履歴（図にない。ENG-007） | `SESSION#{session_id}` | `HISTORY#{student_id}#{update_datetime}` | — | — | before_status, after_status, reason_remarks, teacher_id | 4 |
+| タッチログ（図にない。ENG-007） | `SESSION#{session_id}` | `TOUCH#{touch_id}` | — | `CARD#{card_uid}` / `TOUCH#{touch_id}` | card_uid, result_div, touch_datetime | 3 |
 
-全エンティティが持つ（設計書では ED19 テンプレートの共通項目）。
+- 授業回（AttendanceSession）と、その出欠・修正履歴・タッチログは、同じ `SESSION#{session_id}` のパーティションに入る（授業回の集約が出欠を持つ、というドメインモデルのとおり）。
+- `touch_id` は ULID（時刻順に並ぶ）。
+- 授業回の日時を変えたときは、その授業回の出欠の GSI キー（`start_datetime` を含む）も更新する。出欠は受付開始より後にできるので、通常は起きない。
 
-| 論理名 | 物理名 | 備考 |
+## アクセスパターンと操作
+
+| # | 場面 | 操作 |
 |---|---|---|
-| 作成者 | 未定 | |
-| 作成日時 | 未定 | |
-| 更新者 | 未定 | |
-| 更新日時 | 未定 | |
-| 更新バージョン | `last_update_version` | 楽観的排他制御用。初期値0（`attendance_trn` の定義より） |
-| 削除フラグ | 未定 | |
+| 1 | 申告: 学生証から学生を特定 | GetItem `CARD#{card_uid}` / `#VALID`（student_id が分かる） |
+| 2 | 申告: 授業回の受付状態の確認 | GetItem `SESSION#{session_id}` / `#META`（class_id・reception_status） |
+| 3 | 申告: 受講学生か確認 | GetItem `CLASS#{class_id}` / `STUDENT#{student_id}` |
+| 4 | 申告: 登録（二重防止）とタッチログ | TransactWriteItems: 出欠を `attribute_not_exists(PK)` で Put ＋ タッチログを Put。条件に外れたら申告済み |
+| 5 | 受付中の申告人数／受講者数 | Query（COUNT）`SESSION#…` で SK が `STUDENT#` 始まり／`CLASS#…` で SK が `STUDENT#` 始まり |
+| 6 | 授業回別出欠一覧 | Query `SESSION#…` で SK が `STUDENT#` 始まり。氏名は BatchGet |
+| 7 | 学生別欠課時数一覧 | Query GSI2 `CLASS#{class_id}` で SK が `ATT#` 始まり |
+| 8 | 学生ホーム・授業別出欠記録 | Query GSI1 `STUDENT#{student_id}` で SK が `CLASS#` 始まり（受講授業）／`ATT#` 始まり（出欠） |
+| 9 | 教員ホーム・今日の授業回 | Query GSI1 `TEACHER#{teacher_id}` で SK が `CLASS#` 始まり（担当授業）。授業ごとに Query GSI1 `CLASS#{class_id}` で SK が今日の範囲 |
+| 10 | 受付自動締切（1分ごと） | Query GSI2 `RECEIVING` で SK が現在時刻以前。締切では GSI2 のキーを消す |
+| 11 | サインイン後の本人の特定 | GetItem `USER#{user_id}`、`STUDENT#{user_id}` または `TEACHER#{user_id}` |
+| 12 | 修正履歴・タッチログの参照 | Query `SESSION#…` で SK が `HISTORY#{student_id}` 始まり／`TOUCH#` 始まり。カード単位は GSI2 `CARD#{card_uid}` |
+| 13 | 欠課警告メール（希望） | Query GSI1 `ALL_CLASS` で授業を取り、授業ごとに #7 と同じ取得 |
+| 14 | 担当授業かの確認（全API） | GetItem `CLASS#{class_id}` / `TEACHER#{teacher_id}` |
+| 15 | 学生一覧・学籍番号で探す | Query GSI1 `ALL_STUDENT`（SK＝学籍番号）。学生証の状態は Query `STUDENT#{id}` で SK が `CARD#` 始まり |
 
-## エンティティ一覧
+## 制約の守り方
 
-「ドメインモデル」の列は [domain-model.md](domain-model.md) の名前。**No.12・13 は提出版にない**（ENG-006）。
-
-| No. | 物理名（提出版） | 論理名 | ドメインモデル | エンティティID | 主な項目 | 説明 |
-|---|---|---|---|---|---|---|
-| 1 | teacher_mst | 教員 | Teacher | E000001 | teacher_id, teacher_name, email, User への参照 | User を参照する。email を User に移すかは未決（N-11） |
-| 2 | student_mst | 学生 | Student | E000002 | student_id, student_cd（学籍番号）, student_name, email, User への参照 | 学籍番号は一意。User を参照する。email を User に移すかは未決（N-11） |
-| 3 | student_card_mst | 学生証 | 図にない（ENG-007） | E000003 | student_card_id, card_uid, student_id, valid_flg, invalid_datetime | 再発行時は古い学生証を valid_flg=0 にする。有効な card_uid は一意（R-05-2, R-05-3） |
-| 4 | period_mst | 時限 | 図にない（ENG-007） | E000004 | period_seq, start_tm, end_tm | 各時限の開始・終了時刻 |
-| 5 | course_mst | 授業 | Class | E000005 | course_id, subject_name, day_div, period_seq, room_name, start_dt, end_dt, session_hours, absence_limit_hours | session_hours＝1回あたりの時間数、absence_limit_hours＝欠課上限。**提出版の teacher_id は持たない**（担当教員は No.13） |
-| 6 | enrollment_mst | 受講 | StudentClassMembership | E000006 | course_id, student_id | 授業と学生の組。組で一意 |
-| 7 | class_session_trn | 授業回 | AttendanceSession | E000007 | class_session_id, course_id, session_dt, start_tm, end_tm, session_div, reception_status | 授業登録時に期間と曜日から自動生成し、休講・補講で編集する。授業回の項目と受付状態の持ち方は未決（N-12） |
-| 8 | attendance_trn | 出欠 | Attendance | E000008 | attendance_id, class_session_id, student_id, attendance_status, touch_datetime, input_div | 授業回×学生で1件。授業回（AttendanceSession）が持ち、受講（StudentClassMembership）を参照する |
-| 9 | attendance_history_trn | 出欠修正履歴 | 図にない（ENG-007） | E000009 | attendance_history_id, attendance_id, before_status, after_status, reason_remarks, teacher_id, update_datetime | いつ・誰が・何を直したか（R-04-2） |
-| 10 | card_touch_log_trn | タッチログ | 図にない（ENG-007） | E000010 | touch_log_id, class_session_id, card_uid, result_div, touch_datetime | エラーも含めて全件記録 |
-| 11 | absence_summary_v | 欠課時数集計 | 図にない（計算で求める） | E000011 | course_id, student_id, absent_count, late_count, absence_hours, remaining_hours | **DBには作らない。** backend が計算する（下の「欠課時数の集計」） |
-| 12 | User（物理名・エンティティIDは未定） | ユーザー | User | 未定 | 項目は未決（N-11）。ログインID（Microsoft のメールアドレス）を持つ想定 | サインインするユーザー。Student / Teacher から参照される（ENG-003, ENG-006） |
-| 13 | ClassTeacherMembership（物理名・エンティティIDは未定） | 担当 | ClassTeacherMembership | 未定 | course_id, teacher_id | 授業と教員の組。1つの授業に複数の教員がいてよい（ENG-006）。提出版の course_mst.teacher_id の代わり |
-
-「主な項目」は設計書にある項目の名前だけで、**`attendance_trn` 以外は型・NULL制約が未定**。
-
-## attendance_trn（出欠）
-
-データ型は提出版（RDB）のもの。DynamoDB では数値（N）・文字列（S）に読み替える。
-
-| No. | 論理名 | 物理名 | キー | 提出版のデータ型 | NULL制約 | 備考 |
-|---|---|---|---|---|---|---|
-| 1 | 出欠ID | attendance_id | PK | bigint | NOT NULL | |
-| 2 | 授業回ID | class_session_id | FK, UK | bigint | NOT NULL | class_session_trn 参照。この授業回（AttendanceSession）が出欠を持つ |
-| 3 | 学生ID | student_id | FK, UK | bigint | NOT NULL | student_mst 参照。その授業の受講（enrollment_mst）がある学生に限る（ENG-006） |
-| 4 | 出欠区分 | attendance_status | | integer | NOT NULL | [codes.md](../catalog/codes.md) の出欠区分 |
-| 5 | 申告日時 | touch_datetime | | datetime | NULL可 | 学生証で申告したサーバ時刻。教員入力・自動は NULL |
-| 6 | 入力区分 | input_div | | varchar(1) | NOT NULL | 1:カード 2:教員修正 3:自動 |
-| 7 | 更新バージョン | last_update_version | | integer | NOT NULL | 楽観的排他制御用。初期値0 |
-
-提出版のインデックスは、主キー（attendance_id）と一意キー（class_session_id, student_id）の2つ。共通項目は省略している。
-
-## 制約（設計書に書かれているもの）
-
-DynamoDB には一意制約がないので、「守り方」の列は候補で、物理設計（N-01）で決める。
-
-| エンティティ | 制約 | 出典 | 守り方（候補） |
-|---|---|---|---|
-| student_mst | student_cd（学籍番号）は一意 | 7.1 | 条件付き書き込み＋トランザクション |
-| student_card_mst | 有効な card_uid は一意 | 7.1（R-05-2, R-05-3） | 条件付き書き込み＋トランザクション |
-| enrollment_mst | (course_id, student_id) は一意 | 7.1 | キーを (授業, 学生) にする |
-| attendance_trn | (class_session_id, student_id) は一意。同時に2回かざしても二重にならない | 6.2（R-01-3）, 7.3 | キーを (授業回, 学生) にして、`attribute_not_exists` の条件付き書き込みで登録する |
+| 制約 | 守り方 |
+|---|---|
+| 授業回×学生で出欠1件 | 上の #4。キーが (授業回, 学生) なので、条件付き Put で二重にならない |
+| 有効な card_uid は一意 | 学生証の登録: TransactWriteItems で `CARD#{card_uid}` / `#VALID`（`attribute_not_exists`）と学生証の項目を作る。重複は `A_S0005_E000001`。無効化: `#VALID` を消し、学生証の valid_flg=0・invalid_datetime を書く |
+| 学籍番号は一意 | 学生登録: TransactWriteItems で `STUDENTCD#{student_cd}` / `#LOCK`、学生、ユーザーを作る |
+| 受講・担当は組で一意 | キーが (授業, 学生／教員) なので、条件付き Put で守る |
+| 出欠の楽観的排他 | 出欠修正: `last_update_version = :v` を条件にした更新。外れたら `A_S0004_E000002`。修正履歴は同じトランザクションで書く |
+| 受付トークン | **保存しない。** 受付開始時に、授業回IDと期限を入れた署名付きトークンを発行し、検証だけで確かめる（項目を増やさないため）。受付中でなくなれば使えない |
+| 休講の回は出欠を記録しない | backend が `session_div=9` の授業回への申告を断る |
+| 外部キー相当の整合性 | backend が確かめる（DynamoDB は守らない） |
 
 ## 欠課時数の集計（提出版の absence_summary_v）
 
-出典: 設計書 6.1・7.1。授業 × 学生ごとの欠課時数を、出欠から**毎回計算する**（保存しない）。DynamoDB にビューはないので、backend が計算する。計算式は提出版のまま。
+出典: 設計書 6.1。授業 × 学生ごとの欠課時数を、出欠から**毎回計算する**（保存しない）。取得は上の #7（教員）と #8（学生）。計算式は提出版のまま。
 
 | 項目 | 内容 |
 |---|---|
-| course_id, student_id | 授業と学生 |
 | absent_count | 出欠区分が欠課（40）の件数 |
 | late_count | 出欠区分が遅刻（20）の件数 |
-| absence_hours | `absent_count × course_mst.session_hours ＋ (late_count を3で割った商)` |
-| remaining_hours | `course_mst.absence_limit_hours － absence_hours`（上限までの残り） |
+| absence_hours | `absent_count × session_hours ＋ (late_count を3で割った商)` |
+| remaining_hours | `absence_limit_hours － absence_hours`（上限までの残り） |
 
 - 公欠（50）は数えない。早退（30）も数えない（換算は未決。[decisions.md](../decisions.md) の #2）。
-- 休講の授業回（session_div=9）は出欠を記録しないので、集計に入らない。
-- 出欠が1件もない受講学生にも1行出す（欠課0時間）ため、`enrollment_mst`（受講）を起点に集計する（設計書に明記はない。学生ホームで「上限までの残り」を出すために必要）。
+- 休講の授業回は出欠がないので、集計に入らない。
+- 出欠が1件もない受講学生にも欠課0時間で出す。受講（StudentClassMembership）を起点にする。
 
-## アクセスパターン
+## 提出版との差
 
-物理設計（キー・GSI）を決めるための材料。設計書の処理から、DBに必要な検索を挙げた。
+| 提出版 | この案 |
+|---|---|
+| 10テーブル＋1ビュー | 単一テーブル。ビューはなく、backend が計算する |
+| 共通項目（作成者・作成日時・更新者・更新日時・削除フラグ）を全テーブルに | 持たない。更新バージョンは出欠だけ。削除は物理削除 |
+| `course_mst` に曜日・時限・期間・担当教員 | 授業は科目名・教室・1回あたりの時間数・欠課上限だけ。曜日・時限・期間は授業回を作るときの入力で、保存しない。担当教員は担当（ClassTeacherMembership） |
+| `student_mst` / `teacher_mst` に email | email はユーザー（User）にだけある（ログインID） |
+| `attendance_id`・`touch_log_id` などの連番ID | キーに吸収した。出欠は (授業回, 学生) で特定する |
+| 出欠修正履歴の `attendance_history_id`・`attendance_id` | キー（授業回＋学生＋更新日時）に吸収した |
+| 受付トークン（保存する想定） | 署名付きトークンで、保存しない |
 
-| # | 場面 | 何で探すか | 出典 |
-|---|---|---|---|
-| 1 | 申告: 学生証から学生を特定 | card_uid（有効なもの） | 6.2 手順3 |
-| 2 | 申告: 授業回の受付状態の確認 | class_session_id | 6.2 手順2 |
-| 3 | 申告: 受講学生か確認 | course_id ＋ student_id | 6.2 手順4 |
-| 4 | 申告: 申告済みか確認・登録 | class_session_id ＋ student_id（一意） | 6.2 手順5・6 |
-| 5 | 受付中の申告人数／受講者数 | 授業回の出欠件数、授業の受講学生数 | 6.4 |
-| 6 | 授業回別出欠一覧 | class_session_id の全出欠 | A_S0003_SL0002 |
-| 7 | 学生別欠課時数一覧 | course_id の全授業回の全出欠 | A_S0003_SL0003 |
-| 8 | 学生ホーム・授業別出欠記録 | student_id の受講授業。student_id ＋ course_id の出欠 | A_S0002_SL0001, SL0002 |
-| 9 | 教員ホーム | 担当（ClassTeacherMembership）から teacher_id の担当授業と、今日の授業回 | A_S0003_SL0001 |
-| 10 | 受付自動締切（1分ごと） | 受付中（reception_status=1）で終了時刻を過ぎた授業回 | A_B0001 |
-| 11 | サインイン後の本人の特定 | ログインID（メールアドレス）から User、その学生／教員のレコード | ENG-003, ENG-006 |
-| 12 | 出欠修正履歴・タッチログの参照 | attendance_id、class_session_id、card_uid | 7.1 |
-| 13 | 欠課警告メール（希望） | 欠課時数がしきい値以上の学生（全授業） | A_M0001 |
-| 14 | 担当授業かの確認（全API） | course_id ＋ teacher_id | 10.2 認可 |
+## 実装で決める事項
 
-## 実装で決める事項（提出版に記載なし）
-
-実装に入る前に決めて、`../decisions.md` に記録する。
-
-- テーブル構成（エンティティごとに分けるか、まとめるか）、キー、GSI。上のアクセスパターンを満たすこと（N-01）。
-- IDの採番方法（N-03）。
-- User の項目、email の置き場所、Student / Teacher からの User への参照の持ち方（N-11）。
-- 授業回（AttendanceSession）の項目と受付状態の持ち方（N-12）。
-- 担当（ClassTeacherMembership）の一意制約。受講と同じく (授業, 教員) の組で一意にする想定。
-- 共通項目の物理名、論理削除（削除フラグ）の扱い。削除済みのデータを一意制約や集計から外す方法。
-- `attendance_trn` 以外の項目の型。日時・時刻の文字列の形式。
-- 「有効な card_uid は一意」の守り方（トランザクションでの更新など）。
-- メールアドレス（User のログインID）の一意性。ユーザープールが学生用と教員用に分かれているので、プールごとに一意であればよいが、同じアドレスを両方に作ってよいかを決める。
-- 外部キー相当の整合性（例: 授業を削除したときの授業回・出欠・受講・担当の扱い）を、backend のどこで守るか。
+- 学生・教員の登録で、Cognito のユーザー作成とDBへの書き込みの順序と、片方が失敗したときの戻し方（[ENG-009](../decisions.md)）。
+- 時限マスタの初期データ（各時限の開始・終了時刻）。
+- 授業回を作る処理（曜日・時限・期間から日付ごとに作る）の詳細。
+- 外部キー相当の整合性（例: 授業を削除したときの授業回・出欠・受講・担当の扱い）。

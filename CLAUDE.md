@@ -6,11 +6,12 @@
 
 ## 提出版から変更した事項
 
-上の設計書（提出版）と食い違うときは、こちらを優先する。経緯と詳細は [docs/engineering/decisions.md](docs/engineering/decisions.md) の ENG-001〜006。
+上の設計書（提出版）と食い違うときは、こちらを優先する。経緯と詳細は [docs/engineering/decisions.md](docs/engineering/decisions.md) の ENG-001〜010。
 
-- **DB**: MySQL → **Amazon DynamoDB**（ENG-001）。ビュー・外部キー・自動採番・SQLがない。
-- **認証**: Microsoft Entra ID → **Amazon Cognito のID・パスワード管理**（ENG-002）。ログインIDは Microsoft のメールアドレス（ENG-003）。ユーザープールは学生用と教員用の2つで、サインインは Hosted UI（ENG-004）。**Cognito との接続は最終フェーズ**で、それまでは仮の認証で開発する（ENG-005）。
+- **DB**: MySQL → **Amazon DynamoDB**（ENG-001）。ビュー・外部キー・自動採番・SQLがない。形は [docs/engineering/system/db-schema.md](docs/engineering/system/db-schema.md) のとおり（ENG-010）。
+- **認証**: Microsoft Entra ID → **Amazon Cognito のID・パスワード管理**（ENG-002）。ログインIDは Microsoft のメールアドレス（ENG-003）。ユーザープールは学生用と教員用の2つで、サインインは Hosted UI（ENG-004）。**Cognito との接続は最終フェーズ**で、それまでは仮の認証で開発する（ENG-005）。ユーザーは Cognito の標準フロー（招待メールの仮パスワード → 初回サインインで本登録）で作る（ENG-009）。
 - **ドメインモデル**: [docs/engineering/system/domain-model.md](docs/engineering/system/domain-model.md) の図を使う（ENG-006）。User と ClassTeacherMembership が加わり、授業と教員は多対多。出欠は学生ではなく受講（StudentClassMembership）を参照し、授業回（AttendanceSession）が持つ。
+- **項目数**: 詳細の項目は自由に決めてよいが、1エンティティにつき**キー以外5つ以内**（ENG-008）。
 
 ## ドキュメントの構成
 
@@ -20,8 +21,8 @@
 docs/
 ├── engineering/   共有事項: basic-design.md（提出版）、decisions.md、system/（db-schema, domain-model）、catalog/（messages, codes）
 ├── backend/       Web API・バッチ・認証・メール・ファイル処理の決定事項
-├── frontend/      Webアプリ（React）の決定事項、mocks/（画面モック）
-└── windows/       受付アプリ（C# / WPF）の決定事項
+├── frontend/      Webアプリ（React）の決定事項、mocks/（画面モック。index.html）
+└── windows/       受付アプリ（C# / WPF）の決定事項、mocks/（画面モック。index.html）
 ```
 
 - `engineering/basic-design.md` は**提出版で、書き換えない**。
@@ -48,15 +49,15 @@ docs/
 - 出欠の判定（出席／遅刻／欠課）は**サーバ時刻**で行う。クライアントの時刻は使わない。
 - 欠課時数は**保存しない**。DynamoDB にビューはないので、backend が出欠から毎回計算する（式は6.1）。公欠は数えない。
 - 出欠は「授業回×学生」で1件。二重登録を防ぐ（DynamoDB の条件付き書き込みなど）。
-- 全タッチ（エラー含む）を `card_touch_log_trn` に残す。
-- 出欠修正は理由必須で、変更前後を `attendance_history_trn` に残す。
-- 排他制御は楽観的排他（`last_update_version`）。
-- 全エンティティに共通項目（作成者・作成日時・更新者・更新日時・更新バージョン・削除フラグ）を持たせる。
+- 全タッチ（エラー含む）をタッチログに残す。
+- 出欠修正は理由必須で、変更前後を出欠修正履歴に残す。
+- 出欠（Attendance）の修正は楽観的排他（`last_update_version`）で守る。
+- 項目は、1エンティティにつきキー以外5つ以内（ENG-008）。共通項目（作成者・作成日時など）は持たない。
 - 「誰のデータを見せるか」は、画面から送られたIDではなく、サーバが認証トークンから決める。全APIで担当授業かを確認する。
 - カードIDは画面に出さない。DynamoDB は SQL を使わない（PartiQL を使う場合はパラメータ付き）。UIは日本語のみ。
 
 ## 命名規則（2章）
 
 - 機能ID `A_<S|F|M|A|B><4桁>`、画面ID `<機能ID>_<SL|SD|SP><4桁>`、メッセージID `<機能ID>_<E|W|I><6桁>`
-- 項目は `_cd` `_id` `_name` `_dt` `_tm` `_datetime` `_div` `_status` `_flg` などの接尾辞。テーブル（DynamoDB のテーブル名）の付け方は物理設計で決める。
+- 項目は `_cd` `_id` `_name` `_dt` `_tm` `_datetime` `_div` `_status` `_flg` などの接尾辞。
 - メッセージ文言・コード値は `docs/engineering/catalog/` の台帳（設計書8章が元）をそのまま使う。

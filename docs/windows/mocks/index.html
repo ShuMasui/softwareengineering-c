@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>受付アプリ UIモック（簡易）</title>
+<style>
+  body { font-family: system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif; margin: 0; background: #f3f4f6; color: #111; }
+  header { background: #1f2937; color: #fff; padding: 12px 16px; }
+  header h1 { margin: 0; font-size: 18px; }
+  header p { margin: 4px 0 0; font-size: 12px; color: #d1d5db; }
+  nav { padding: 8px 16px; background: #fff; border-bottom: 1px solid #ddd; font-size: 13px; }
+  nav a { margin-right: 12px; }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; }
+  section.screen { margin: 0 0 32px; }
+  section.screen > h2 { margin: 0; font-size: 17px; }
+  .id { color: #666; font-size: 12px; margin: 2px 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .state { font-size: 12px; color: #444; margin: 0 0 4px; font-weight: bold; }
+  .win { background: #fff; border: 1px solid #9ca3af; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+  .win .title { background: #374151; color: #fff; font-size: 12px; padding: 4px 8px; display: flex; justify-content: space-between; }
+  .win .body { padding: 12px; font-size: 14px; }
+  .class-line { background: #f3f4f6; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }
+  .class-line small { color: #555; }
+  .count { font-size: 28px; font-weight: bold; text-align: center; margin: 6px 0; }
+  .timer { text-align: center; color: #555; font-size: 13px; margin-bottom: 10px; }
+  .result { min-height: 70px; border-radius: 6px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 18px; font-weight: bold; padding: 8px; margin-bottom: 10px; }
+  .r-ok { background: #bbf7d0; } .r-late { background: #fef08a; } .r-bad { background: #fecaca; } .r-done { background: #bfdbfe; } .r-warn { background: #fed7aa; } .r-idle { background: #e5e7eb; color: #555; font-weight: normal; font-size: 14px; }
+  .big { display: block; width: 100%; padding: 12px; font-size: 18px; border: none; border-radius: 6px; cursor: pointer; }
+  .big.start { background: #2563eb; color: #fff; }
+  .big.stop { background: #dc2626; color: #fff; }
+  button.sm, .btn { padding: 5px 10px; border: 1px solid #6b7280; border-radius: 4px; background: #fff; font-size: 13px; cursor: pointer; text-decoration: none; color: #111; display: inline-block; }
+  .note { font-size: 12px; color: #555; margin: 8px 0 0; }
+  ul.students { list-style: none; margin: 0; padding: 0; font-size: 14px; }
+  ul.students li { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; }
+  ul.students li.cur { background: #dbeafe; font-weight: bold; }
+  .tag { padding: 1px 8px; border-radius: 10px; font-size: 12px; background: #e5e7eb; }
+  .tag.ok { background: #bbf7d0; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  select { padding: 6px; font-size: 14px; width: 100%; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<header>
+  <h1>受付アプリ UIモック（簡易）</h1>
+  <p>教室のWindows PCで動く受付アプリ（C# / WPF）の2画面。見た目と状態の確認用で、動作はしない。</p>
+</header>
+<nav>
+  <a href="#A_S0001_SD0001">授業選択・受付</a>
+  <a href="#A_S0005_SD0002">学生証登録モード</a>
+</nav>
+<main>
+
+<!-- 13 -->
+<section class="screen" id="A_S0001_SD0001">
+  <h2>授業選択・受付</h2>
+  <div class="id">A_S0001_SD0001 ／ 教員・学生。教員の操作は「受付開始／終了」の1ボタンだけ。学生は学生証をかざすだけ。</div>
+  <div class="grid">
+
+    <div>
+      <p class="state">1. サインイン前</p>
+      <div class="win"><div class="title"><span>出欠受付</span><span>－ □ ×</span></div><div class="body">
+        <p style="text-align:center;font-size:18px;margin:20px 0">出欠受付アプリ</p>
+        <button class="big start" type="button">教員アカウントでサインイン</button>
+        <p class="note">Cognito の教員ユーザープール（Hosted UI）で認証する。サインインの方法は未決（N-06）。</p>
+      </div></div>
+    </div>
+
+    <div>
+      <p class="state">2. 受付開始前（授業開始の30分前から開始できる）</p>
+      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
+        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201<br><small>2026-11-16　今の時刻に合う授業回を自動で選択（変更も可）</small></div>
+        <select><option>データベース　2限　3-201</option><option>情報ネットワーク　1限　3-105</option></select>
+        <div class="count" style="margin-top:12px">0 / 40</div>
+        <div class="result r-idle">受付を開始してください</div>
+        <button class="big start" type="button">受付開始</button>
+      </div></div>
+    </div>
+
+    <div>
+      <p class="state">3. 受付中・出席（緑）</p>
+      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
+        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
+        <div class="count">32 / 40</div>
+        <div class="timer">遅刻まであと 12 分</div>
+        <div class="result r-ok">青木 一郎さん　出席</div>
+        <button class="big stop" type="button">受付終了</button>
+        <p class="note">結果は、かざした直後3秒表示する。成功音。</p>
+      </div></div>
+    </div>
+
+    <div>
+      <p class="state">4. 遅刻（黄）</p>
+      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
+        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
+        <div class="count">33 / 40</div>
+        <div class="timer">欠課まであと 7 分</div>
+        <div class="result r-late">伊藤 花子さん　遅刻</div>
+        <button class="big stop" type="button">受付終了</button>
+      </div></div>
+    </div>
+
+    <div>
+      <p class="state">5. 欠課（赤）</p>
+      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
+        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
+        <div class="count">34 / 40</div>
+        <div class="timer">—</div>
+        <div class="result r-bad">上田 健さん　欠課</div>
+        <button class="big stop" type="button">受付終了</button>
+        <p class="note">開始後15分を過ぎた申告は欠課。切り替わる判定はもうない。</p>
+      </div></div>
+    </div>
+
+    <div>
+      <p class="state">6. 申告済み（青）　A_S0001_I000002</p>
+      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
+        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
+        <div class="count">34 / 40</div>
+        <div class="timer">—</div>
+        <div class="result r-done">遠藤 美咲さんは申告済みです</div>
+        <button class="big stop" type="button">受付終了</button>
+        <p class="note">記録は変えない。</p>
+      </div></div>
+    </div>
+
+    <div>
+      <p class="state">7. エラー: 未登録の学生証（赤）　A_S0001_E000001</p>
+      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
+        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
+        <div class="count">34 / 40</div>
+        <div class="timer">—</div>
+        <div class="result r-bad">登録されていない学生証です。担当の先生に申し出てください</div>
+        <button class="big stop" type="button">受付終了</button>
+        <p class="note">エラー音。タッチログには残る。</p>
+      </div></div>
+    </div>
+
+    <div>
+      <p class="state">8. エラー: 受講対象外（赤）　A_S0001_E000002</p>
+      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
+        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
+        <div class="count">34 / 40</div>
+        <div class="timer">—</div>
+        <div class="result r-bad">この授業の受講学生ではありません</div>
+        <button class="big stop" type="button">受付終了</button>
+      </div></div>
+    </div>
+
+    <div>
+      <p class="state">9. 受付終了後のタッチ（赤）　A_S0001_E000003</p>
+      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
+        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
+        <div class="count">40 / 40</div>
+        <div class="result r-bad">受付が終了しています</div>
+        <button class="big start" type="button" disabled>受付終了済み</button>
+        <p class="note">締切時に、記録のない学生は欠課（自動）で登録される。</p>
+      </div></div>
+    </div>
+
+    <div>
+      <p class="state">10. 読み取り失敗　A_S0001_W000001</p>
+      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
+        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
+        <div class="count">12 / 40</div>
+        <div class="timer">遅刻まであと 12 分</div>
+        <div class="result r-warn">読み取れませんでした。もう一度かざしてください</div>
+        <button class="big stop" type="button">受付終了</button>
+        <p class="note">サーバには送らない。色・音は設計書に指定がない。</p>
+      </div></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- 14 -->
+<section class="screen" id="A_S0005_SD0002">
+  <h2>学生証登録モード</h2>
+  <div class="id">A_S0005_SD0002 ／ 教員。学生を順に選び、学生証をかざして続けて登録する（R-05-1, R-05-4）。</div>
+  <div class="grid">
+
+    <div>
+      <p class="state">1. 登録待ち</p>
+      <div class="win"><div class="title"><span>学生証登録　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
+        <div class="two">
+          <div>
+            <ul class="students">
+              <li>2301 青木 一郎 <span class="tag ok">登録済み</span></li>
+              <li>2302 伊藤 花子 <span class="tag ok">登録済み</span></li>
+              <li class="cur">2303 上田 健 <span class="tag">登録待ち</span></li>
+              <li>2304 遠藤 美咲 <span class="tag">未登録</span></li>
+            </ul>
+          </div>
+          <div>
+            <div class="result r-idle">2303 上田 健さん<br>学生証をかざしてください</div>
+            <button class="sm" type="button">この学生を飛ばす</button>
+          </div>
+        </div>
+        <div class="count" style="font-size:18px">登録済み 2 / 40</div>
+        <button class="big stop" type="button">登録を終える</button>
+      </div></div>
+    </div>
+
+    <div>
+      <p class="state">2. 登録できた（緑）</p>
+      <div class="win"><div class="title"><span>学生証登録　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
+        <div class="two">
+          <div>
+            <ul class="students">
+              <li>2301 青木 一郎 <span class="tag ok">登録済み</span></li>
+              <li>2302 伊藤 花子 <span class="tag ok">登録済み</span></li>
+              <li>2303 上田 健 <span class="tag ok">登録済み</span></li>
+              <li class="cur">2304 遠藤 美咲 <span class="tag">登録待ち</span></li>
+            </ul>
+          </div>
+          <div>
+            <div class="result r-ok">上田 健さん<br>学生証を登録しました</div>
+            <p class="note">自動で次の学生に進む。</p>
+          </div>
+        </div>
+        <div class="count" style="font-size:18px">登録済み 3 / 40</div>
+        <button class="big stop" type="button">登録を終える</button>
+      </div></div>
+    </div>
+
+    <div>
+      <p class="state">3. エラー: 別の学生に登録済み（赤）　A_S0005_E000001</p>
+      <div class="win"><div class="title"><span>学生証登録　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
+        <div class="two">
+          <div>
+            <ul class="students">
+              <li>2302 伊藤 花子 <span class="tag ok">登録済み</span></li>
+              <li>2303 上田 健 <span class="tag ok">登録済み</span></li>
+              <li class="cur">2304 遠藤 美咲 <span class="tag">登録待ち</span></li>
+            </ul>
+          </div>
+          <div>
+            <div class="result r-bad">この学生証は別の学生に登録済みです</div>
+            <button class="sm" type="button">もう一度かざす</button>
+          </div>
+        </div>
+        <div class="count" style="font-size:18px">登録済み 3 / 40</div>
+        <button class="big stop" type="button">登録を終える</button>
+      </div></div>
+    </div>
+
+  </div>
+  <p class="note">再発行のときは、Webアプリの「学生登録」で古い学生証を無効にしてから、この画面で新しい学生証を登録する。</p>
+</section>
+
+</main>
+</body>
+</html>

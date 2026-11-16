@@ -13,6 +13,7 @@ docs/
 ├── frontend/           Webアプリ（React）
 │   └── mocks/            画面モック
 └── windows/            教室PCの受付アプリ（C# / WPF）
+    └── mocks/            画面モック
 ```
 
 ## 各ディレクトリの役割
