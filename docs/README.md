@@ -7,9 +7,10 @@ docs/
 ├── engineering/        共有事項（全領域で使う）
 │   ├── basic-design.md   提出版の基本設計書（固定）
 │   ├── decisions.md      共有の決定事項・未決事項の状況
+│   ├── repo-structure.md リポジトリ構成の案
 │   ├── system/           db-schema、domain-model
 │   └── catalog/          画面に出す文言・コード値の台帳
-├── backend/            Web API・バッチ・認証・メール・ファイル処理
+├── backend/            Web API・バッチ・認証・メール・ファイル処理（api.md: API一覧の案）
 ├── frontend/           Webアプリ（React）
 │   └── mocks/            画面モック
 └── windows/            教室PCの受付アプリ（C# / WPF）

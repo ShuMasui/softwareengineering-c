@@ -21,19 +21,20 @@ IDは `ENG-` ＋ 3桁の連番。新しいものを下に足す。「提出版�
 
 ## 裁定により新たに生じた未決事項
 
-ENG-001〜010 で決める必要が出たこと。決まったら、決定ログに記録し、ここの行を消す（または「決定」と書く）。
+ENG-001〜010 で決める必要が出たこと。決まったら、決定ログに記録し、ここの行を消す。「仮の決め」は、実装を止めないために置いた案で、**ユーザーの確認はまだ**。確認前でも、この仮の決めに従って実装する。
 
 | ID | 未決事項 | 仮の決め | 関わる決定 | 主に関わる領域 |
 |---|---|---|---|---|
-| N-02 | 欠課時数の集計の仕方（ビューが使えない） | backend が出欠から毎回計算する。保存はしない（提出版の方針を保つ） | ENG-001 | backend |
-| N-04 | Cognito ユーザーの作り方の残り（名簿取込で新規登録する学生、招待メールの再送、パスワードを忘れたとき、DBとの書き込み順） | 学生・教員の登録時に Cognito が招待メールを送る（ENG-009）。再送・パスワード再設定は Cognito の標準機能 | ENG-002, ENG-003, ENG-009 | backend |
-| N-05 | サインイン画面で、学生用・教員用の Hosted UI へ分ける方法 | モックは2つのボタン（[mocks/](../frontend/mocks/index.html)） | ENG-004 | frontend |
-| N-06 | 受付アプリ（WPF）が Hosted UI でサインインする方法 | なし | ENG-004 | windows |
-| N-07 | Cognito をつなぐ**前**の仮の認証の方式（ENG-009 は Cognito の登録フローで、これとは別。意図の確認待ち） | なし | ENG-005 | backend, frontend, windows |
-| N-08 | セッション30分の失効、CSRF対策（Cookie＋CSRFトークン）と、Cognito のトークンの扱い | なし | ENG-002 | backend, frontend |
-| N-09 | 欠課警告メール（希望）の送信手段。提出版は Microsoft Graph API | なし。希望機能なので後回しにできる | ENG-002 | backend |
-| N-10 | 3つの CTX の名前（図では未記入） | 仮に「ユーザー」「授業」「出欠」と呼ぶ | ENG-006 | engineering |
+| N-04 | Cognito ユーザーの作り方の残り（名簿取込で新規登録する学生、招待の再送、パスワードを忘れたとき、DBとの書き込み順、最初の教員） | 先に Cognito にユーザーを作り（招待メールが届く）、次に DynamoDB に書く。DBに失敗したら Cognito のユーザーを消す。再送とパスワード再設定は Cognito の標準機能。最初の教員は、管理者が Cognito に作り、初期データの投入で Teacher と User を作る（設計書11章の未決 #3 も同じ）。詳細は [api.md](../backend/api.md) | ENG-002, ENG-003, ENG-009 | backend |
+| N-05 | サインイン画面で、学生用・教員用の Hosted UI へ分ける方法 | サインイン画面に「学生」「教員」の2つのボタンを置き、それぞれのプールの Hosted UI に移す（`/auth/login?pool=student` と `pool=teacher`）。[モック](../frontend/mocks/index.html) のとおり | ENG-004 | frontend |
+| N-06 | 受付アプリ（WPF）が Hosted UI でサインインする方法 | 既定のブラウザで Hosted UI を開き、認可コード＋PKCE でサインインする（受け取りは localhost のループバックURL）。詳細は [windows/README.md](../windows/README.md) | ENG-004 | windows |
+| N-07 | Cognito をつなぐ**前**の仮の認証の方式（ENG-009 は Cognito の登録フローで、これとは別。意図の確認待ち） | 開発用の認証モード（`AUTH_MODE=dev`）。リクエストヘッダ `X-Dev-User` の `user_id` で本人になる。本番では無効。認証は `AuthProvider` の1か所に隔離し、最終フェーズで Cognito に差し替える | ENG-005 | backend, frontend, windows |
+| N-08 | セッション30分の失効、CSRF対策（Cookie＋CSRFトークン）と、Cognito のトークンの扱い | Web は backend がログインを受け持ち、署名付きセッション Cookie（HttpOnly・Secure・SameSite=Lax、最終操作から30分で失効する更新型）を発行する。更新系は `X-CSRF-Token`。受付アプリは Cookie を使わず Bearer。詳細は [api.md](../backend/api.md) | ENG-002 | backend, frontend |
+| N-09 | 欠課警告メール（希望）の送信手段。提出版は Microsoft Graph API | Amazon SES（AWS を使うため）。希望機能なので後回し | ENG-002 | backend |
+| N-10 | 3つの CTX の名前（図では未記入） | 仮の呼び名「ユーザー」「授業」「出欠」をそのまま使う | ENG-006 | engineering |
 | N-13 | 担当教員が複数いるときの権限（修正・受付・授業の編集）。提出版は担当教員1人 | 担当教員（ClassTeacherMembership にいる教員）は、すべて同じ権限 | ENG-006 | backend |
+| N-14 | 担当教員の追加方法（画面がない。モックにもない） | 授業を登録した教員が担当になる。2人目以降の追加は、今は画面もAPIも用意しない | ENG-006 | backend, frontend |
+| N-15 | リポジトリ構成とローカル開発の環境（設計書にない） | [repo-structure.md](repo-structure.md) の案（`apps/api`、`apps/web`、`apps/reception`。開発は DynamoDB Local） | なし | engineering |
 
 ## 未決事項の状況（設計書11章）
 
@@ -43,7 +44,7 @@ ENG-001〜010 で決める必要が出たこと。決まったら、決定ログ
 |---|---|---|---|---|
 | 1 | 1回の授業を欠課何時間と数えるか | 90分＝2時間、授業ごとに変更可 | 未決 | backend |
 | 2 | 早退を欠課時数にどう換算するか | 区分だけ用意し、換算しない | 未決 | backend |
-| 3 | 最初の教員アカウントを誰が登録するか | 初期データとして投入 | 未決（教員は Cognito の教員ユーザープールにも作る必要がある。N-04） | backend |
+| 3 | 最初の教員アカウントを誰が登録するか | 初期データとして投入 | 仮の決めあり（管理者が Cognito に作り、初期データの投入で Teacher を作る。N-04） | backend |
 | 4 | 教員が受付を開始し忘れた授業回の扱い | 自動で欠課にせず「未実施」と表示 | 未決 | backend, frontend |
 | 5 | 学生証から読めるIDの種類（FeliCa の IDm か別方式か） | RC-S300 の実機で確認する | 未決 | windows |
 | 6 | 受付アプリを Windows デスクトップアプリにする案でよいか | Windowsデスクトップアプリ（代替案: ブラウザ＋WebUSB） | 未決 | windows |

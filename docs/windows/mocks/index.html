@@ -3,251 +3,326 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>受付アプリ UIモック（簡易）</title>
+<title>受付アプリ UIモック</title>
 <style>
-  body { font-family: system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif; margin: 0; background: #f3f4f6; color: #111; }
-  header { background: #1f2937; color: #fff; padding: 12px 16px; }
-  header h1 { margin: 0; font-size: 18px; }
-  header p { margin: 4px 0 0; font-size: 12px; color: #d1d5db; }
-  nav { padding: 8px 16px; background: #fff; border-bottom: 1px solid #ddd; font-size: 13px; }
-  nav a { margin-right: 12px; }
-  main { max-width: 980px; margin: 0 auto; padding: 16px; }
-  section.screen { margin: 0 0 32px; }
-  section.screen > h2 { margin: 0; font-size: 17px; }
-  .id { color: #666; font-size: 12px; margin: 2px 0 12px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-  .state { font-size: 12px; color: #444; margin: 0 0 4px; font-weight: bold; }
-  .win { background: #fff; border: 1px solid #9ca3af; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
-  .win .title { background: #374151; color: #fff; font-size: 12px; padding: 4px 8px; display: flex; justify-content: space-between; }
-  .win .body { padding: 12px; font-size: 14px; }
-  .class-line { background: #f3f4f6; border-radius: 4px; padding: 6px 8px; margin-bottom: 10px; }
+  * { box-sizing: border-box; }
+  body { margin: 0; height: 100vh; display: flex; flex-direction: column; font-family: system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif; background: #e5e7eb; color: #111; }
+  .top { background: #1f2937; color: #fff; padding: 8px 16px; font-size: 14px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .top a { color: #93c5fd; font-size: 12px; margin-left: 8px; }
+  .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 340px 1fr; }
+  aside { background: #fff; border-right: 1px solid #d1d5db; overflow: auto; padding: 12px; font-size: 13px; }
+  aside h2 { margin: 0 0 4px; font-size: 15px; }
+  aside .hint { color: #555; font-size: 12px; margin: 0 0 10px; line-height: 1.5; }
+  details.cuj { border: 1px solid #d1d5db; border-radius: 6px; margin-bottom: 8px; background: #fafafa; }
+  details.cuj > summary { cursor: pointer; padding: 8px; font-weight: bold; }
+  .badge { display: inline-block; background: #dbeafe; color: #1e40af; border-radius: 10px; padding: 0 8px; font-size: 11px; margin-right: 6px; font-weight: normal; }
+  ol.steps { margin: 0; padding: 0 8px 8px 28px; }
+  ol.steps li { margin: 2px 0; }
+  details.br > summary { cursor: pointer; padding: 3px 6px; border-radius: 4px; }
+  details.br > summary em { font-style: normal; color: #2563eb; font-size: 11px; margin-left: 4px; }
+  details.br ul { list-style: none; margin: 2px 0 4px; padding-left: 12px; border-left: 2px solid #bfdbfe; }
+  button.step { all: unset; cursor: pointer; display: block; padding: 3px 6px; border-radius: 4px; line-height: 1.4; }
+  button.step:hover { background: #e0e7ff; }
+  button.step.on { background: #2563eb; color: #fff; }
+  .stage { overflow: auto; padding: 14px 18px 24px; display: flex; flex-direction: column; align-items: center; }
+  .crumb { width: 100%; max-width: 1100px; font-size: 13px; margin-bottom: 8px; color: #374151; }
+  .crumb code { background: #f3f4f6; padding: 1px 6px; border-radius: 4px; }
+  .monitor { width: 100%; max-width: 1100px; }
+  .bezel { background: #111827; border-radius: 14px 14px 6px 6px; padding: 14px 14px 22px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+  .neck { width: 120px; height: 26px; margin: 0 auto; background: linear-gradient(#4b5563, #1f2937); clip-path: polygon(15% 0, 85% 0, 100% 100%, 0 100%); }
+  .foot { width: 240px; height: 8px; margin: 0 auto; background: #1f2937; border-radius: 4px; }
+  .demo { width: 100%; max-width: 1100px; margin-top: 12px; font-size: 13px; color: #1e3a8a; background: #dbeafe; border-radius: 6px; padding: 8px 12px; }
+  .demo:empty { display: none; }
+
+  /* Windows のデスクトップ */
+  .desk { position: relative; height: 640px; border-radius: 4px; overflow: hidden; background: linear-gradient(135deg, #1e3a8a, #2563eb 55%, #93c5fd); }
+  .winwrap { position: absolute; left: 50%; top: 28px; transform: translateX(-50%); width: 540px; }
+  .win { background: #fff; border: 1px solid #6b7280; border-radius: 6px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+  .win .title { background: #374151; color: #fff; font-size: 12px; padding: 5px 10px; display: flex; justify-content: space-between; }
+  .win .menu { background: #f3f4f6; border-bottom: 1px solid #d1d5db; padding: 5px 10px; font-size: 12px; display: flex; gap: 14px; }
+  .win .menu a { color: #374151; text-decoration: none; cursor: pointer; padding-bottom: 2px; }
+  .win .menu a.on { color: #1d4ed8; font-weight: bold; border-bottom: 2px solid #1d4ed8; }
+  .win .menu a.right { margin-left: auto; }
+  .win .body { padding: 14px; font-size: 14px; }
+  .task { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; background: rgba(17,24,39,.92); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-size: 12px; }
+  .task .start { font-size: 18px; margin-right: 12px; }
+  .task .app { background: rgba(255,255,255,.18); padding: 4px 12px; border-radius: 3px; }
+  .task .clock { text-align: right; line-height: 1.2; }
+  .class-line { background: #f3f4f6; border-radius: 4px; padding: 7px 9px; margin-bottom: 10px; }
   .class-line small { color: #555; }
-  .count { font-size: 28px; font-weight: bold; text-align: center; margin: 6px 0; }
-  .timer { text-align: center; color: #555; font-size: 13px; margin-bottom: 10px; }
-  .result { min-height: 70px; border-radius: 6px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 18px; font-weight: bold; padding: 8px; margin-bottom: 10px; }
-  .r-ok { background: #bbf7d0; } .r-late { background: #fef08a; } .r-bad { background: #fecaca; } .r-done { background: #bfdbfe; } .r-warn { background: #fed7aa; } .r-idle { background: #e5e7eb; color: #555; font-weight: normal; font-size: 14px; }
-  .big { display: block; width: 100%; padding: 12px; font-size: 18px; border: none; border-radius: 6px; cursor: pointer; }
-  .big.start { background: #2563eb; color: #fff; }
-  .big.stop { background: #dc2626; color: #fff; }
-  button.sm, .btn { padding: 5px 10px; border: 1px solid #6b7280; border-radius: 4px; background: #fff; font-size: 13px; cursor: pointer; text-decoration: none; color: #111; display: inline-block; }
+  .count { font-size: 34px; font-weight: bold; text-align: center; margin: 8px 0 2px; }
+  .timer { text-align: center; color: #555; font-size: 13px; margin-bottom: 10px; min-height: 18px; }
+  .result { min-height: 84px; border-radius: 6px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 20px; font-weight: bold; padding: 8px; margin-bottom: 12px; }
+  .r-ok { background: #bbf7d0; } .r-late { background: #fef08a; } .r-bad { background: #fecaca; } .r-done { background: #bfdbfe; } .r-warn { background: #fed7aa; } .r-idle { background: #e5e7eb; color: #555; font-weight: normal; font-size: 15px; }
+  .big { display: block; width: 100%; padding: 13px; font-size: 18px; border: none; border-radius: 6px; cursor: pointer; font-family: inherit; }
+  .big.start { background: #2563eb; color: #fff; } .big.stop { background: #dc2626; color: #fff; } .big:disabled { opacity: .45; cursor: not-allowed; }
+  .btn { display: inline-block; padding: 5px 10px; border: 1px solid #6b7280; border-radius: 4px; background: #fff; font-size: 13px; cursor: pointer; font-family: inherit; color: #111; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  select { padding: 6px; font-size: 14px; width: 100%; }
   .note { font-size: 12px; color: #555; margin: 8px 0 0; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   ul.students { list-style: none; margin: 0; padding: 0; font-size: 14px; }
-  ul.students li { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; }
+  ul.students li { padding: 6px 8px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; }
   ul.students li.cur { background: #dbeafe; font-weight: bold; }
   .tag { padding: 1px 8px; border-radius: 10px; font-size: 12px; background: #e5e7eb; }
   .tag.ok { background: #bbf7d0; }
-  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  select { padding: 6px; font-size: 14px; width: 100%; box-sizing: border-box; }
+  .signin { text-align: center; padding: 22px 0 8px; }
+  .signin .big { margin-top: 18px; }
+
+  /* デモ用の操作パネル */
+  .panel { width: 100%; max-width: 1100px; margin-top: 14px; background: #fff; border: 1px solid #d1d5db; border-radius: 6px; padding: 12px 14px; font-size: 13px; }
+  .panel h3 { margin: 0 0 8px; font-size: 14px; }
+  .panel .row { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .panel select { width: auto; min-width: 230px; font-size: 13px; }
+  .panel .cards button { margin: 0 6px 6px 0; }
+  .panel table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  .panel th, .panel td { border: 1px solid #e5e7eb; padding: 3px 8px; text-align: left; }
+  .panel th { background: #f3f4f6; }
 </style>
 </head>
 <body>
-<header>
-  <h1>受付アプリ UIモック（簡易）</h1>
-  <p>教室のWindows PCで動く受付アプリ（C# / WPF）の2画面。見た目と状態の確認用で、動作はしない。</p>
-</header>
-<nav>
-  <a href="#A_S0001_SD0001">授業選択・受付</a>
-  <a href="#A_S0005_SD0002">学生証登録モード</a>
-</nav>
-<main>
-
-<!-- 13 -->
-<section class="screen" id="A_S0001_SD0001">
-  <h2>授業選択・受付</h2>
-  <div class="id">A_S0001_SD0001 ／ 教員・学生。教員の操作は「受付開始／終了」の1ボタンだけ。学生は学生証をかざすだけ。</div>
-  <div class="grid">
-
-    <div>
-      <p class="state">1. サインイン前</p>
-      <div class="win"><div class="title"><span>出欠受付</span><span>－ □ ×</span></div><div class="body">
-        <p style="text-align:center;font-size:18px;margin:20px 0">出欠受付アプリ</p>
-        <button class="big start" type="button">教員アカウントでサインイン</button>
-        <p class="note">Cognito の教員ユーザープール（Hosted UI）で認証する。サインインの方法は未決（N-06）。</p>
-      </div></div>
+<div class="top">
+  <span><b>出欠管理システム</b>　受付アプリ（教室のWindows PC）UIモック（画面は操作できます）</span>
+  <span><a href="../../frontend/mocks/index.html">← Webアプリのモックへ</a><a href="#" id="reset">モックを初期状態に戻す</a></span>
+</div>
+<div class="layout">
+  <aside id="side"></aside>
+  <section class="stage">
+    <div class="crumb" id="crumb"></div>
+    <div class="monitor">
+      <div class="bezel"><div class="desk" id="desk"></div></div>
+      <div class="neck"></div><div class="foot"></div>
     </div>
+    <div class="demo" id="demoNote"></div>
+    <div class="panel" id="panel"></div>
+  </section>
+</div>
 
-    <div>
-      <p class="state">2. 受付開始前（授業開始の30分前から開始できる）</p>
-      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
-        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201<br><small>2026-11-16　今の時刻に合う授業回を自動で選択（変更も可）</small></div>
-        <select><option>データベース　2限　3-201</option><option>情報ネットワーク　1限　3-105</option></select>
-        <div class="count" style="margin-top:12px">0 / 40</div>
-        <div class="result r-idle">受付を開始してください</div>
-        <button class="big start" type="button">受付開始</button>
-      </div></div>
-    </div>
+<script>
+(function () {
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const START = '09:00', LATE_END = '09:15';
+  const ROSTER = [
+    { cd: '2301', name: '青木 一郎', card: 'A' }, { cd: '2302', name: '伊藤 花子', card: 'B' },
+    { cd: '2303', name: '上田 健', card: 'C' }, { cd: '2304', name: '遠藤 美咲', card: 'D' }
+  ];
+  const CARDS = [
+    ['A', '青木 一郎'], ['B', '伊藤 花子'], ['C', '上田 健'], ['D', '遠藤 美咲'],
+    ['X', '未登録の学生証'], ['E', '受講していない学生（小川 太郎）'], ['F', '読み取りに失敗']
+  ];
+  const CODE = { 1: '受付', 2: '申告済み', 7: '受講対象外', 8: '未登録', 9: '締切後' };
+  const TIMES = [['08:40', '08:40（授業開始の20分前）'], ['08:55', '08:55（授業開始の5分前）'], ['09:07', '09:07（開始の7分後）'], ['09:20', '09:20（開始の20分後）'], ['10:30', '10:30（授業の終了時刻）']];
+  const mins = x => { const p = x.split(':').map(Number); return p[0] * 60 + p[1]; };
 
-    <div>
-      <p class="state">3. 受付中・出席（緑）</p>
-      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
-        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
-        <div class="count">32 / 40</div>
-        <div class="timer">遅刻まであと 12 分</div>
-        <div class="result r-ok">青木 一郎さん　出席</div>
-        <button class="big stop" type="button">受付終了</button>
-        <p class="note">結果は、かざした直後3秒表示する。成功音。</p>
-      </div></div>
-    </div>
+  function fresh() {
+    return {
+      signed: false, signing: false, screen: 'signin', time: '08:40', state: 0, touched: {}, others: 0,
+      result: null, closeNote: '', log: [], mute: false,
+      reg: { list: [{ cd: '2305', name: '小川 太郎', done: true }, { cd: '2306', name: '岡田 結衣', done: true }, { cd: '2307', name: '加藤 大輝', done: false }, { cd: '2308', name: '木村 さくら', done: false }], idx: 2, result: null }
+    };
+  }
+  let W = fresh(), rt = null, ac = null;
+  const count = () => Object.keys(W.touched).length + W.others;
 
-    <div>
-      <p class="state">4. 遅刻（黄）</p>
-      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
-        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
-        <div class="count">33 / 40</div>
-        <div class="timer">欠課まであと 7 分</div>
-        <div class="result r-late">伊藤 花子さん　遅刻</div>
-        <button class="big stop" type="button">受付終了</button>
-      </div></div>
-    </div>
+  /* ---------- 音 ---------- */
+  function beep(ok) {
+    if (W.mute) return;
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = ok ? 'sine' : 'square'; o.frequency.value = ok ? 880 : 220; g.gain.value = 0.05;
+      o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + (ok ? 0.12 : 0.35));
+    } catch (e) { /* 音が出せない環境では何もしない */ }
+  }
 
-    <div>
-      <p class="state">5. 欠課（赤）</p>
-      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
-        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
-        <div class="count">34 / 40</div>
-        <div class="timer">—</div>
-        <div class="result r-bad">上田 健さん　欠課</div>
-        <button class="big stop" type="button">受付終了</button>
-        <p class="note">開始後15分を過ぎた申告は欠課。切り替わる判定はもうない。</p>
-      </div></div>
-    </div>
+  /* ---------- 受付の処理（サーバがやる判定を、ここでは真似している） ---------- */
+  const judge = t => t <= START ? '出席' : (t <= LATE_END ? '遅刻' : '欠課');
+  function show(cls, text, ok) {
+    W.result = { cls, text }; beep(ok); clearTimeout(rt);
+    rt = setTimeout(() => { W.result = null; render(); }, 3000);
+  }
+  function addLog(who, code) { W.log.unshift({ t: W.time, who, code }); W.log = W.log.slice(0, 8); }
+  function touch(id, silent) {
+    if (id === 'F') { show('r-warn', '読み取れませんでした。もう一度かざしてください', false); render(); return; }
+    const stu = ROSTER.find(r => r.card === id), who = stu ? stu.name : (id === 'E' ? '小川 太郎' : '（不明）');
+    if (W.state === 2) { addLog(who, 9); show('r-bad', '受付が終了しています', false); }
+    else if (id === 'X') { addLog(who, 8); show('r-bad', '登録されていない学生証です。担当の先生に申し出てください', false); }
+    else if (id === 'E') { addLog(who, 7); show('r-bad', 'この授業の受講学生ではありません', false); }
+    else if (W.touched[stu.cd]) { addLog(who, 2); show('r-done', stu.name + 'さんは申告済みです', true); }
+    else {
+      const st = judge(W.time); W.touched[stu.cd] = { st, time: W.time }; addLog(who, 1);
+      if (!silent) show(st === '出席' ? 'r-ok' : (st === '遅刻' ? 'r-late' : 'r-bad'), stu.name + 'さん　' + st, st !== '欠課');
+    }
+    render();
+  }
+  function startReception() { W.state = 1; W.result = null; render(); }
+  function closeReception(auto) {
+    const n = 40 - count();
+    ROSTER.forEach(r => { if (!W.touched[r.cd]) W.touched[r.cd] = { st: '欠課', time: '自動' }; });
+    W.others = 40 - Object.keys(W.touched).length;
+    W.state = 2; W.result = null;
+    W.closeNote = (auto ? '授業の終了時刻になったので、自動で締め切りました。' : '受付を終了しました。') + '記録のない ' + n + ' 名を欠課（自動）で登録しました。';
+    render();
+  }
+  function setTime(v) { W.time = v; if (W.state === 1 && mins(v) >= mins('10:30')) { closeReception(true); return; } render(); }
+  function timerText() {
+    if (W.state !== 1) return '—';
+    if (mins(W.time) < mins(START)) return '遅刻まであと ' + (mins(START) - mins(W.time)) + ' 分';
+    if (mins(W.time) <= mins(LATE_END)) return '欠課まであと ' + (mins(LATE_END) - mins(W.time)) + ' 分';
+    return '—（これ以降は欠課）';
+  }
 
-    <div>
-      <p class="state">6. 申告済み（青）　A_S0001_I000002</p>
-      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
-        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
-        <div class="count">34 / 40</div>
-        <div class="timer">—</div>
-        <div class="result r-done">遠藤 美咲さんは申告済みです</div>
-        <button class="big stop" type="button">受付終了</button>
-        <p class="note">記録は変えない。</p>
-      </div></div>
-    </div>
+  /* ---------- 学生証登録モード ---------- */
+  const regCur = () => W.reg.idx >= 0 ? W.reg.list[W.reg.idx] : null;
+  function regNext(from) {
+    const l = W.reg.list; let found = -1;
+    for (let i = 0; i < l.length && found < 0; i++) { const j = (from + i) % l.length; if (!l[j].done) found = j; }
+    W.reg.idx = found;
+  }
+  function touchReg(kind) {
+    const c = regCur();
+    if (kind === 'fail') { W.reg.result = { cls: 'r-warn', text: '読み取れませんでした。もう一度かざしてください' }; beep(false); }
+    else if (kind === 'dup') { W.reg.result = { cls: 'r-bad', text: 'この学生証は別の学生に登録済みです' }; beep(false); }
+    else if (!c) { W.reg.result = { cls: 'r-idle', text: 'すべての学生の登録が終わりました' }; }
+    else { c.done = true; W.reg.result = { cls: 'r-ok', text: c.name + 'さん　学生証を登録しました' }; beep(true); regNext(W.reg.idx); }
+    render();
+  }
 
-    <div>
-      <p class="state">7. エラー: 未登録の学生証（赤）　A_S0001_E000001</p>
-      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
-        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
-        <div class="count">34 / 40</div>
-        <div class="timer">—</div>
-        <div class="result r-bad">登録されていない学生証です。担当の先生に申し出てください</div>
-        <button class="big stop" type="button">受付終了</button>
-        <p class="note">エラー音。タッチログには残る。</p>
-      </div></div>
-    </div>
+  /* ---------- 描画 ---------- */
+  function win(title, menu, body) { return '<div class="winwrap"><div class="win"><div class="title"><span>' + title + '</span><span>－ □ ×</span></div>' + menu + '<div class="body">' + body + '</div></div></div>'; }
+  const menu = cur => '<div class="menu"><a class="' + (cur === 'reception' ? 'on' : '') + '" data-act="toReception">授業選択・受付</a><a class="' + (cur === 'register' ? 'on' : '') + '" data-act="toRegister">学生証登録モード</a><a class="right" data-act="signout">サインアウト</a></div>';
 
-    <div>
-      <p class="state">8. エラー: 受講対象外（赤）　A_S0001_E000002</p>
-      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
-        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
-        <div class="count">34 / 40</div>
-        <div class="timer">—</div>
-        <div class="result r-bad">この授業の受講学生ではありません</div>
-        <button class="big stop" type="button">受付終了</button>
-      </div></div>
-    </div>
+  function winHtml() {
+    if (W.screen === 'signin') {
+      return win('出欠受付', '', '<div class="signin"><p style="font-size:20px;margin:0">出欠受付アプリ</p>' +
+        (W.signing ? '<p class="note">ブラウザで Cognito の Hosted UI を開いています…</p>' : '<button class="big start" data-act="signin">教員アカウントでサインイン</button><p class="note">Cognito の教員ユーザープール（Hosted UI）で認証します。方式は未決（N-06）。</p>') + '</div>');
+    }
+    if (W.screen === 'register') {
+      const r = W.reg, c = regCur(), done = r.list.filter(x => x.done).length;
+      const res = r.result || { cls: 'r-idle', text: c ? c.cd + ' ' + c.name + 'さん<br>学生証をかざしてください' : 'すべての学生の登録が終わりました' };
+      return win('学生証登録　佐藤 先生', menu('register'),
+        '<div class="two"><div><ul class="students">' + r.list.map((x, i) => '<li class="' + (i === r.idx ? 'cur' : '') + '"><span>' + x.cd + ' ' + x.name + '</span><span class="tag ' + (x.done ? 'ok' : '') + '">' + (x.done ? '登録済み' : (i === r.idx ? '登録待ち' : '未登録')) + '</span></li>').join('') + '</ul><p class="note">…ほか 36 名（モックでは省略）</p></div>' +
+        '<div><div class="result ' + res.cls + '">' + res.text + '</div><button class="btn" data-act="skipReg">この学生を飛ばす</button></div></div>' +
+        '<div class="count" style="font-size:20px">登録済み ' + done + ' / 40</div><button class="big stop" data-act="toReception">登録を終える</button>');
+    }
+    const idle = W.state === 0 ? '受付を開始してください' : (W.state === 1 ? '学生証をかざしてください' : (W.closeNote || '受付は終了しました'));
+    const res = W.result || { cls: 'r-idle', text: idle };
+    const lab = W.state === 0 ? '受付開始' : (W.state === 1 ? '受付終了' : '受付終了済み');
+    return win('出欠受付　佐藤 先生', menu('reception'),
+      '<div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201<br><small>2026-11-16　今の時刻に合う授業回を自動で選択（変更も可）</small></div>' +
+      '<select' + (W.state ? ' disabled' : '') + '><option>データベース　2限　3-201</option><option>情報ネットワーク　1限　3-105</option></select>' +
+      '<div class="count">' + count() + ' / 40</div><div class="timer">' + timerText() + '</div><div class="result ' + res.cls + '">' + res.text + '</div>' +
+      '<button class="big ' + (W.state === 1 ? 'stop' : 'start') + '" data-act="' + (W.state === 0 ? 'start' : 'stop') + '"' + (W.state === 2 ? ' disabled' : '') + '>' + lab + '</button>' +
+      (W.state === 0 ? '<p class="note">授業開始の30分前（08:30）から受付を開始できます。教員の操作は、この1ボタンだけです。</p>' : ''));
+  }
+  function panelHtml() {
+    let h = '<h3>デモ用の操作（実機では、サーバとカードリーダーが担当する部分）</h3><div class="row"><label>サーバ時刻　<select id="clock">' + TIMES.map(t => '<option value="' + t[0] + '"' + (t[0] === W.time ? ' selected' : '') + '>' + t[1] + '</option>').join('') + '</select></label>' +
+      '<label><input type="checkbox" id="snd"' + (W.mute ? '' : ' checked') + '> 音を鳴らす</label></div>';
+    if (W.screen === 'register') {
+      h += '<div class="cards"><b>カードリーダー（学生証登録モード）</b><br><button class="btn" data-act="regNew">新しい学生証をかざす</button><button class="btn" data-act="regDup">別の学生に登録済みの学生証をかざす</button><button class="btn" data-act="regFail">読み取りに失敗する</button></div>';
+    } else if (W.screen === 'reception') {
+      const off = W.state === 0 ? ' disabled' : '';
+      h += '<div class="cards"><b>カードリーダー（学生証をかざす）</b>' + (W.state === 0 ? '　<span class="note">受付開始前は、かざしても読み取りません。</span>' : '') + '<br>' + CARDS.map(c => '<button class="btn" data-act="touch" data-card="' + c[0] + '"' + off + '>' + c[1] + '</button>').join('') +
+        '<button class="btn" data-act="others"' + off + '>他の学生 10 人がかざす</button></div>';
+    }
+    h += '<h3 style="margin-top:8px">タッチログ（サーバ側。エラーも全件残る）</h3>' + (W.log.length ? '<table><tr><th>時刻</th><th>学生証の持ち主</th><th>結果</th></tr>' + W.log.map(l => '<tr><td>' + l.t + '</td><td>' + l.who + '</td><td>' + l.code + ' ' + CODE[l.code] + '</td></tr>').join('') + '</table>' : '<p class="note">まだありません。</p>');
+    return h;
+  }
+  function render() {
+    $('#desk').innerHTML = winHtml() + '<div class="task"><span><span class="start">⊞</span><span class="app">出欠受付</span></span><span class="clock">' + W.time + '<br>2026/11/16</span></div>';
+    $('#panel').innerHTML = panelHtml();
+    const names = { signin: 'サインイン（起動直後）', reception: '授業選択・受付', register: '学生証登録モード' };
+    const ids = { signin: '（受付アプリの起動）', reception: 'A_S0001_SD0001', register: 'A_S0005_SD0002' };
+    $('#crumb').innerHTML = '現在の画面: <b>' + names[W.screen] + '</b> <code>' + ids[W.screen] + '</code>';
+  }
+  function toast(t) { $('#demoNote').textContent = t ? 'デモの設定: ' + t : ''; }
 
-    <div>
-      <p class="state">9. 受付終了後のタッチ（赤）　A_S0001_E000003</p>
-      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
-        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
-        <div class="count">40 / 40</div>
-        <div class="result r-bad">受付が終了しています</div>
-        <button class="big start" type="button" disabled>受付終了済み</button>
-        <p class="note">締切時に、記録のない学生は欠課（自動）で登録される。</p>
-      </div></div>
-    </div>
+  /* ---------- 画面内の操作 ---------- */
+  const ACT = {
+    signin() { W.signing = true; render(); setTimeout(() => { W.signing = false; W.signed = true; W.screen = 'reception'; render(); }, 1200); },
+    signout() { W = fresh(); render(); },
+    toReception() { W.screen = 'reception'; W.reg.result = null; render(); },
+    toRegister() { W.screen = 'register'; render(); },
+    start() { startReception(); },
+    stop() { closeReception(false); },
+    touch(el) { touch(el.dataset.card); },
+    others() { W.others = Math.min(40 - Object.keys(W.touched).length, W.others + 10); render(); },
+    regNew() { touchReg('new'); }, regDup() { touchReg('dup'); }, regFail() { touchReg('fail'); },
+    skipReg() { regNext((W.reg.idx + 1) % W.reg.list.length); W.reg.result = null; render(); }
+  };
 
-    <div>
-      <p class="state">10. 読み取り失敗　A_S0001_W000001</p>
-      <div class="win"><div class="title"><span>出欠受付　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
-        <div class="class-line"><strong>データベース</strong>　2限 09:00-10:30　3-201</div>
-        <div class="count">12 / 40</div>
-        <div class="timer">遅刻まであと 12 分</div>
-        <div class="result r-warn">読み取れませんでした。もう一度かざしてください</div>
-        <button class="big stop" type="button">受付終了</button>
-        <p class="note">サーバには送らない。色・音は設計書に指定がない。</p>
-      </div></div>
-    </div>
+  /* ---------- 左側のユースケース（CUJ） ---------- */
+  function prep(time) { W.signed = true; W.screen = 'reception'; if (W.state === 2) { const s = W.signed; W = fresh(); W.signed = s; W.screen = 'reception'; } W.state = 1; W.time = time; W.result = null; }
+  function seed() { W.touched = { 2301: { st: '出席', time: '08:55' }, 2302: { st: '遅刻', time: '09:07' }, 2304: { st: '出席', time: '08:57' } }; W.others = 26; }
+  const touchStep = (time, card, pre) => function () { prep(time); if (pre) touch(pre, true); touch(card); };
+  const CUJS = [
+    { actor: '教員・学生', title: '授業の受付を行う', steps: [
+      { t: '受付アプリを起動して、教員がサインインする', run() { W = fresh(); render(); toast('ボタンを押すと、ブラウザで Hosted UI を開く想定の動きを見せます（方式は未決 N-06）。'); } },
+      { t: '今の授業が自動で選ばれる。「受付開始」を押す', run() { const s = W.signed; W = fresh(); W.signed = true; W.screen = 'reception'; render(); toast('「受付開始」を押してください。開始できるのは授業開始の30分前（08:30）からです。'); } },
+      { t: '学生が学生証をかざす', br: [
+        { t: '授業開始前にかざす → 出席（緑）', run: touchStep('08:55', 'A') },
+        { t: '開始の7分後にかざす → 遅刻（黄）', run: touchStep('09:07', 'B') },
+        { t: '開始の20分後にかざす → 欠課（赤）', run: touchStep('09:20', 'C') },
+        { t: '同じ学生が2回かざす → 申告済み（青）', run: touchStep('08:55', 'A', 'A') },
+        { t: '登録されていない学生証（A_S0001_E000001）', run: touchStep('08:55', 'X') },
+        { t: '受講していない学生（A_S0001_E000002）', run: touchStep('08:55', 'E') },
+        { t: '読み取りに失敗する（A_S0001_W000001）', run: touchStep('08:55', 'F') }
+      ] },
+      { t: '受付を終了する', br: [
+        { t: '教員が「受付終了」を押す', run() { prep('09:20'); seed(); closeReception(false); toast('記録のない受講学生が、欠課（自動）で登録されます。'); } },
+        { t: '授業の終了時刻（10:30）に自動で締め切られる', run() { prep('09:20'); seed(); setTime('10:30'); toast('受付自動締切（A_B0001）。受付中のまま終了時刻を過ぎると、サーバが締め切ります。'); } }
+      ] },
+      { t: '締切後に学生がかざす（A_S0001_E000003）', run() { prep('09:20'); seed(); closeReception(false); touch('A'); } }
+    ] },
+    { actor: '教員', title: '学生証を登録する', steps: [
+      { t: '学生証登録モードを開く', run() { W.signed = true; W.screen = 'register'; W.reg = fresh().reg; render(); toast('学生を順に選び、学生証をかざして続けて登録します。'); } },
+      { t: '学生証をかざす', br: [
+        { t: '登録できる（緑）。自動で次の学生に進む', run() { if (W.screen !== 'register') { W.signed = true; W.screen = 'register'; W.reg = fresh().reg; } touchReg('new'); } },
+        { t: '別の学生に登録済みの学生証（A_S0005_E000001）', run() { if (W.screen !== 'register') { W.signed = true; W.screen = 'register'; W.reg = fresh().reg; } touchReg('dup'); } },
+        { t: '読み取りに失敗する', run() { if (W.screen !== 'register') { W.signed = true; W.screen = 'register'; W.reg = fresh().reg; } touchReg('fail'); } }
+      ] },
+      { t: '登録できなかった学生を飛ばす', run() { W.signed = true; W.screen = 'register'; ACT.skipReg(); } },
+      { t: '登録を終えて、受付の画面に戻る', run() { W.signed = true; W.screen = 'reception'; render(); } }
+    ] }
+  ];
 
-  </div>
-</section>
+  function buildSide() {
+    let h = '<h2>ユースケース（CUJ）</h2><p class="hint">ユーザーの主な操作の流れです。ステップを押すと、その場面を再現します。<b>▼ 分岐</b>を開くと、選択肢が出ます。画面の下の「デモ用の操作」でも、自分でかざせます。</p>';
+    CUJS.forEach((c, i) => {
+      h += '<details class="cuj"' + (i === 0 ? ' open' : '') + '><summary><span class="badge">' + c.actor + '</span>' + c.title + '</summary><ol class="steps">';
+      c.steps.forEach((s, j) => {
+        if (s.br) h += '<li><details class="br"><summary>' + s.t + '<em>▼ 分岐 ' + s.br.length + '</em></summary><ul>' + s.br.map((b, k) => '<li><button class="step" data-k="' + i + '.' + j + '.' + k + '">' + b.t + '</button></li>').join('') + '</ul></details></li>';
+        else h += '<li><button class="step" data-k="' + i + '.' + j + '">' + s.t + '</button></li>';
+      });
+      h += '</ol></details>';
+    });
+    $('#side').innerHTML = h;
+  }
+  function runStep(key) {
+    const p = key.split('.').map(Number), s = CUJS[p[0]].steps[p[1]], step = p.length === 3 ? s.br[p[2]] : s;
+    toast(''); step.run();
+    document.querySelectorAll('button.step').forEach(b => {
+      const on = b.dataset.k === key; b.classList.toggle('on', on);
+      if (on) { let d = b.closest('details.br'); if (d) d.open = true; d = b.closest('details.cuj'); if (d) d.open = true; }
+    });
+  }
 
-<!-- 14 -->
-<section class="screen" id="A_S0005_SD0002">
-  <h2>学生証登録モード</h2>
-  <div class="id">A_S0005_SD0002 ／ 教員。学生を順に選び、学生証をかざして続けて登録する（R-05-1, R-05-4）。</div>
-  <div class="grid">
+  document.addEventListener('click', e => {
+    const a = e.target.closest('[data-act]');
+    if (a && !a.disabled) { e.preventDefault(); ACT[a.dataset.act](a); return; }
+    const st = e.target.closest('button.step');
+    if (st) runStep(st.dataset.k);
+  });
+  document.addEventListener('change', e => {
+    if (e.target.id === 'clock') setTime(e.target.value);
+    if (e.target.id === 'snd') { W.mute = !e.target.checked; }
+  });
+  $('#reset').addEventListener('click', e => { e.preventDefault(); W = fresh(); toast(''); document.querySelectorAll('button.step').forEach(b => b.classList.remove('on')); render(); });
 
-    <div>
-      <p class="state">1. 登録待ち</p>
-      <div class="win"><div class="title"><span>学生証登録　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
-        <div class="two">
-          <div>
-            <ul class="students">
-              <li>2301 青木 一郎 <span class="tag ok">登録済み</span></li>
-              <li>2302 伊藤 花子 <span class="tag ok">登録済み</span></li>
-              <li class="cur">2303 上田 健 <span class="tag">登録待ち</span></li>
-              <li>2304 遠藤 美咲 <span class="tag">未登録</span></li>
-            </ul>
-          </div>
-          <div>
-            <div class="result r-idle">2303 上田 健さん<br>学生証をかざしてください</div>
-            <button class="sm" type="button">この学生を飛ばす</button>
-          </div>
-        </div>
-        <div class="count" style="font-size:18px">登録済み 2 / 40</div>
-        <button class="big stop" type="button">登録を終える</button>
-      </div></div>
-    </div>
-
-    <div>
-      <p class="state">2. 登録できた（緑）</p>
-      <div class="win"><div class="title"><span>学生証登録　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
-        <div class="two">
-          <div>
-            <ul class="students">
-              <li>2301 青木 一郎 <span class="tag ok">登録済み</span></li>
-              <li>2302 伊藤 花子 <span class="tag ok">登録済み</span></li>
-              <li>2303 上田 健 <span class="tag ok">登録済み</span></li>
-              <li class="cur">2304 遠藤 美咲 <span class="tag">登録待ち</span></li>
-            </ul>
-          </div>
-          <div>
-            <div class="result r-ok">上田 健さん<br>学生証を登録しました</div>
-            <p class="note">自動で次の学生に進む。</p>
-          </div>
-        </div>
-        <div class="count" style="font-size:18px">登録済み 3 / 40</div>
-        <button class="big stop" type="button">登録を終える</button>
-      </div></div>
-    </div>
-
-    <div>
-      <p class="state">3. エラー: 別の学生に登録済み（赤）　A_S0005_E000001</p>
-      <div class="win"><div class="title"><span>学生証登録　佐藤 先生</span><span>－ □ ×</span></div><div class="body">
-        <div class="two">
-          <div>
-            <ul class="students">
-              <li>2302 伊藤 花子 <span class="tag ok">登録済み</span></li>
-              <li>2303 上田 健 <span class="tag ok">登録済み</span></li>
-              <li class="cur">2304 遠藤 美咲 <span class="tag">登録待ち</span></li>
-            </ul>
-          </div>
-          <div>
-            <div class="result r-bad">この学生証は別の学生に登録済みです</div>
-            <button class="sm" type="button">もう一度かざす</button>
-          </div>
-        </div>
-        <div class="count" style="font-size:18px">登録済み 3 / 40</div>
-        <button class="big stop" type="button">登録を終える</button>
-      </div></div>
-    </div>
-
-  </div>
-  <p class="note">再発行のときは、Webアプリの「学生登録」で古い学生証を無効にしてから、この画面で新しい学生証を登録する。</p>
-</section>
-
-</main>
+  buildSide();
+  render();
+})();
+</script>
 </body>
 </html>

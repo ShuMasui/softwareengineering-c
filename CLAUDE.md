@@ -19,8 +19,8 @@
 
 ```
 docs/
-├── engineering/   共有事項: basic-design.md（提出版）、decisions.md、system/（db-schema, domain-model）、catalog/（messages, codes）
-├── backend/       Web API・バッチ・認証・メール・ファイル処理の決定事項
+├── engineering/   共有事項: basic-design.md（提出版）、decisions.md、repo-structure.md（構成の案）、system/（db-schema, domain-model）、catalog/（messages, codes）
+├── backend/       Web API・バッチ・認証・メール・ファイル処理の決定事項、api.md（API一覧の案）
 ├── frontend/      Webアプリ（React）の決定事項、mocks/（画面モック。index.html）
 └── windows/       受付アプリ（C# / WPF）の決定事項、mocks/（画面モック。index.html）
 ```

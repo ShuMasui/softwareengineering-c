@@ -29,8 +29,19 @@
 
 [../engineering/decisions.md](../engineering/decisions.md) の #5（読めるIDの種類）、#6（Windowsデスクトップアプリにする案）、#7（オフライン時の扱い）。
 
+## 仮の決め（確認待ち）
+
+設計書に指定がなく、モックで置いた案。ユーザーの確認はまだ。確認前でも、この案に従って実装してよい。
+
+- **サインイン**（N-06）: システムの既定ブラウザで Cognito の Hosted UI を開き、認可コード＋PKCE でサインインする。受け取りは localhost のループバックURL。トークンはメモリだけに持ち、授業が終わるまで更新して維持する。
+- **音**: 成功音＝出席・遅刻・申告済み・学生証の登録成功。エラー音＝欠課・各エラー・読み取り失敗。
+- **読み取り失敗の色**: オレンジ。
+- **欠課になった後の残り時間**: 「—（これ以降は欠課）」を出す。
+- **切替までの残り時間**: 応答の `serverTime` との差でアプリの時計を補正して表示する（判定そのものはサーバが行う）。
+- **通信**: 申告は `POST /api/v1/reception/touches`。表示は、返ってきた `resultDiv`・`messageId`・`message` で決める（[api.md](../backend/api.md)）。
+
 ## 関連文書
 
-- [mocks/index.html](mocks/index.html): 受付アプリ2画面の簡易モック（受付の状態10種、学生証登録モード3種）
+- [mocks/index.html](mocks/index.html): 受付アプリの**操作できる**モック（左にユースケース、右にWindowsのデスクトップ。カードをかざす・時刻を変える操作ができる）
 - 共有: [ドメインモデル](../engineering/system/domain-model.md)、[メッセージ台帳](../engineering/catalog/messages.md)、[コード台帳](../engineering/catalog/codes.md)
 - 決定事項: [decisions.md](decisions.md)
